@@ -16,6 +16,7 @@ const loadSubscriptionsBtn = document.getElementById('loadSubscriptionsBtn');
 const subscriptionSelect = document.getElementById('subscriptionSelect');
 const appendIpsInput = document.getElementById('appendIps');
 const appendBtn = document.getElementById('appendBtn');
+const deleteSubscriptionBtn = document.getElementById('deleteSubscriptionBtn');
 const appendResult = document.getElementById('appendResult');
 
 const qrModal = document.getElementById('qrModal');
@@ -196,7 +197,33 @@ loadSubscriptionsBtn.addEventListener('click', async () => {
 
 subscriptionSelect.addEventListener('change', () => {
   appendBtn.disabled = !subscriptionSelect.value;
+  deleteSubscriptionBtn.disabled = !subscriptionSelect.value;
   appendResult.textContent = '';
+});
+
+deleteSubscriptionBtn.addEventListener('click', async () => {
+  const token = accessTokenInput.value.trim();
+  const updateId = subscriptionSelect.value;
+  if (!token || !updateId) return;
+  const label = subscriptionSelect.options[subscriptionSelect.selectedIndex]?.textContent || updateId;
+  if (!window.confirm(`确定删除「${label}」吗？删除后此订阅链接将失效，无法恢复。`)) return;
+
+  deleteSubscriptionBtn.disabled = true;
+  appendResult.textContent = '删除中...';
+  try {
+    const response = await fetch(`/api/subscriptions/${encodeURIComponent(updateId)}?token=${encodeURIComponent(token)}`, {
+      method: 'DELETE',
+    });
+    const data = await response.json();
+    if (!response.ok || !data.ok) throw new Error(data.error || '删除失败');
+    subscriptionSelect.querySelector(`option[value="${CSS.escape(updateId)}"]`)?.remove();
+    subscriptionSelect.value = '';
+    appendBtn.disabled = true;
+    appendResult.textContent = `✅ 已删除 ${updateId}`;
+  } catch (error) {
+    appendResult.textContent = `❌ ${error.message || '删除失败'}`;
+    deleteSubscriptionBtn.disabled = false;
+  }
 });
 
 appendBtn.addEventListener('click', async () => {

@@ -150,6 +150,24 @@ form.card,
   width: 100%;
 }
 
+.existing-subscriptions .subscription-select-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: stretch;
+}
+
+.existing-subscriptions button.danger {
+  background: rgba(127, 29, 29, 0.28);
+  border: 1px solid rgba(248, 113, 113, 0.26);
+  color: #fecaca;
+  white-space: nowrap;
+}
+
+.existing-subscriptions button.danger:hover {
+  background: rgba(185, 28, 28, 0.42);
+}
+
 .existing-subscriptions #appendResult {
   min-height: 1.5em;
   overflow-wrap: anywhere;
@@ -397,6 +415,14 @@ button.small {
     grid-template-columns: 1fr 1fr;
     gap: 10px;
     align-items: stretch;
+  }
+
+  .existing-subscriptions .subscription-select-row {
+    grid-template-columns: 1fr;
+  }
+
+  .existing-subscriptions button.danger {
+    width: 100%;
   }
 
   .sub-actions input {

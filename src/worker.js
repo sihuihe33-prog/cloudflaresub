@@ -603,6 +603,28 @@ async function handleGenerate(request, env, url) {
   });
 }
 
+async function deleteSubscription(request, url, env) {
+  const tokenCheck = validateAccessToken(url, env);
+  if (!tokenCheck.ok) return tokenCheck.response;
+
+  const id = decodeURIComponent(url.pathname.slice('/api/subscriptions/'.length)).trim();
+  if (!id || !/^[A-Za-z0-9]+$/.test(id)) return json({ ok: false, error: '订阅 ID 无效' }, 400);
+  const key = `sub:${id}`;
+  const existing = await env.SUB_STORE.get(key);
+  if (!existing) return json({ ok: false, error: '订阅不存在' }, 404);
+
+  await env.SUB_STORE.delete(key);
+
+  // Remove dedup pointers to the deleted record, otherwise an identical
+  // future generate could return a dead short link.
+  const dedup = await env.SUB_STORE.list({ prefix: 'dedup:', limit: 1000 });
+  await Promise.all(dedup.keys.map(async (item) => {
+    if ((await env.SUB_STORE.get(item.name)) === id) await env.SUB_STORE.delete(item.name);
+  }));
+
+  return json({ ok: true, deleted: id });
+}
+
 async function listSubscriptions(url, env) {
   const tokenCheck = validateAccessToken(url, env);
   if (!tokenCheck.ok) return tokenCheck.response;
@@ -687,6 +709,10 @@ export default {
 
     if (request.method === 'POST' && url.pathname === '/api/generate') {
       return handleGenerate(request, env, url);
+    }
+
+    if (request.method === 'DELETE' && url.pathname.startsWith('/api/subscriptions/')) {
+      return deleteSubscription(request, url, env);
     }
 
     if (request.method === 'GET' && url.pathname === '/api/subscriptions') {

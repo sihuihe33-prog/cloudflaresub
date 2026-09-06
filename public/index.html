@@ -95,9 +95,12 @@ cf.example.com:443#US-Edge"
           </div>
           <div>
             <label for="subscriptionSelect">选择订阅</label>
-            <select id="subscriptionSelect" disabled>
-              <option value="">请先加载</option>
-            </select>
+            <div class="subscription-select-row">
+              <select id="subscriptionSelect" disabled>
+                <option value="">请先加载</option>
+              </select>
+              <button id="deleteSubscriptionBtn" type="button" class="danger" disabled>删除选中订阅</button>
+            </div>
           </div>
           <div>
             <label for="appendIps">新增优选 IP / 域名</label>
