@@ -74,8 +74,7 @@ cf.example.com:443#US-Edge"
           </div>
 
           <div class="link-management">
-            <p class="eyebrow">4. 链接管理（可选）</p>
-            <label for="personalAccessKey">自己设置的管理密钥</label>
+            <label for="personalAccessKey">4. 自己设置的管理密钥（可选）</label>
             <div class="key-row">
               <input id="personalAccessKey" name="personalAccessKey" type="password" autocomplete="new-password" placeholder="用于以后加载、追加或删除此订阅" />
               <button id="generateKeyBtn" type="button" class="secondary small">随机生成</button>
@@ -113,12 +112,6 @@ cf.example.com:443#US-Edge"
               <select id="subscriptionSelect" multiple size="4" disabled>
                 <option value="" disabled hidden>请先加载</option>
               </select>
-              <div id="subscriptionContextMenu" class="subscription-context-menu hidden" role="menu">
-                <button type="button" data-sub-action="delete">删除选中订阅</button>
-                <button type="button" data-sub-action="copy">复制选中订阅链接</button>
-                <button type="button" data-sub-action="refresh">刷新订阅列表</button>
-                <button type="button" data-sub-action="clear">清空选择</button>
-              </div>
             </div>
           </div>
           <button id="otherSubscriptionsToggle" type="button" class="secondary fold-toggle">收纳其他用户订阅 <span>展开</span></button>
@@ -127,6 +120,12 @@ cf.example.com:443#US-Edge"
             <select id="otherSubscriptionSelect" multiple size="6" disabled>
               <option value="" disabled hidden>请先加载</option>
             </select>
+          </div>
+          <div id="subscriptionContextMenu" class="subscription-context-menu hidden" role="menu">
+            <button type="button" data-sub-action="delete">删除选中订阅</button>
+            <button type="button" data-sub-action="copy">复制选中订阅链接</button>
+            <button type="button" data-sub-action="refresh">刷新订阅列表</button>
+            <button type="button" data-sub-action="clear">清空选择</button>
           </div>
           <p class="hint">我的订阅固定置顶；其他订阅默认收纳。删除时可多选，追加 IP 时请只选择一条。</p>
           <div>

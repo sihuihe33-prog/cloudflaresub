@@ -20,6 +20,7 @@ const otherSubscriptionsPanel = document.getElementById('otherSubscriptionsPanel
 const appendIpsInput = document.getElementById('appendIps');
 const appendBtn = document.getElementById('appendBtn');
 const subscriptionContextMenu = document.getElementById('subscriptionContextMenu');
+const existingSubscription = document.getElementById('existingSubscription');
 const personalAccessKeyInput = document.getElementById('personalAccessKey');
 const saveLocalLinkInput = document.getElementById('saveLocalLink');
 const generateKeyBtn = document.getElementById('generateKeyBtn');
@@ -227,6 +228,7 @@ loadSubscriptionsBtn.addEventListener('click', async () => {
     otherSubscriptionsToggle.querySelector('span').textContent = `展开（${otherItems.length}）`;
     subscriptionSelect.disabled = adminItems.length === 0;
     otherSubscriptionSelect.disabled = otherItems.length === 0;
+    updateSelectionState();
     appendResult.textContent = `已加载 ${data.subscriptions.length} 条订阅，其中我的订阅 ${adminItems.length} 条。`;
   } catch (error) {
     appendResult.textContent = error.message || '加载失败';
@@ -244,8 +246,12 @@ function getSelectedOptions() {
 
 function updateSelectionState() {
   const selectedCount = getSelectedOptions().length;
-  appendBtn.disabled = selectedCount !== 1;
-  appendResult.textContent = selectedCount > 1 ? '已多选，可右键批量删除；追加 IP 时请只保留一条。' : '';
+  appendBtn.disabled = false;
+  appendResult.textContent = selectedCount > 1
+    ? '当前多选了订阅；追加 IP 时请只保留一条。'
+    : selectedCount === 1
+      ? '已选择 1 条订阅，可以追加 IP。'
+      : '请先选择 1 条订阅，再追加 IP。';
 }
 
 subscriptionSelect.addEventListener('change', updateSelectionState);
@@ -260,9 +266,14 @@ for (const select of [subscriptionSelect, otherSubscriptionSelect]) {
   });
   select.addEventListener('contextmenu', (event) => {
     event.preventDefault();
+    const targetRect = event.currentTarget.getBoundingClientRect();
+    const cardRect = existingSubscription.getBoundingClientRect();
+    const menuWidth = 220;
+    const left = Math.max(24, Math.min(targetRect.right - cardRect.left - menuWidth, cardRect.width - menuWidth - 24));
+    subscriptionContextMenu.style.left = `${left}px`;
+    subscriptionContextMenu.style.right = 'auto';
+    subscriptionContextMenu.style.top = `${targetRect.bottom - cardRect.top + 8}px`;
     subscriptionContextMenu.classList.remove('hidden');
-    subscriptionContextMenu.style.left = `${Math.min(event.clientX, window.innerWidth - 230)}px`;
-    subscriptionContextMenu.style.top = `${Math.min(event.clientY, window.innerHeight - 190)}px`;
   });
 }
 
@@ -333,8 +344,10 @@ appendBtn.addEventListener('click', async () => {
   const selected = getSelectedOptions();
   const updateId = selected[0]?.value;
   const appendPreferredIps = appendIpsInput.value.trim();
-  if (!token || !updateId || !appendPreferredIps) {
-    appendResult.textContent = '请填写令牌、选择订阅并填入新增 IP。';
+  if (!token || selected.length !== 1 || !updateId || !appendPreferredIps) {
+    appendResult.textContent = selected.length > 1
+      ? '追加 IP 一次只能选择 1 条订阅；多选请使用右键菜单。'
+      : '请填写管理密钥、选择 1 条订阅并填入新增 IP。';
     return;
   }
   appendBtn.disabled = true;
