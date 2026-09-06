@@ -3,6 +3,11 @@ main = "src/worker.js"
 compatibility_date = "2026-03-06"
 workers_dev = true
 
+# KV 绑定：线上 namespace「优选IP订阅器」
+[[kv_namespaces]]
+binding = "SUB_STORE"
+id = "0c4da625b04b4e338c313496dd346f12"
+
 [assets]
 directory = "./public"
 binding = "ASSETS"
