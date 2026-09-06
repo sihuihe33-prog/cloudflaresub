@@ -127,6 +127,81 @@ form.card,
   font-size: 1.35rem;
 }
 
+.link-management {
+  padding: 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(52, 211, 153, 0.16);
+  background: rgba(16, 185, 129, 0.06);
+}
+
+.link-management .eyebrow {
+  margin-bottom: 12px;
+}
+
+.key-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+}
+
+.save-link-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 14px 0 0;
+  color: var(--text);
+  font-weight: 500;
+}
+
+.save-link-option input {
+  width: 18px;
+  height: 18px;
+}
+
+.local-link-vault {
+  padding-top: 16px;
+  border-top: 1px solid rgba(148, 163, 184, 0.14);
+}
+
+.vault-head,
+.local-link-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.local-links-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.local-link-item {
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.local-link-item code {
+  color: var(--accent);
+  margin-left: 4px;
+}
+
+.local-link-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.local-link-actions .small {
+  min-width: auto;
+  padding: 8px 10px;
+  font-size: 0.82rem;
+}
+
 .existing-subscriptions select,
 .existing-subscriptions input[type="password"] {
   width: 100%;
@@ -450,6 +525,24 @@ button.small {
 
   .copy-row {
     grid-template-columns: 1fr;
+  }
+
+  .key-row {
+    grid-template-columns: 1fr;
+  }
+
+  .vault-head,
+  .local-link-item {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .local-link-actions {
+    width: 100%;
+  }
+
+  .local-link-actions button {
+    flex: 1;
   }
 
   .stats-grid {

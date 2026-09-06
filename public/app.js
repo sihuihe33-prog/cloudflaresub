@@ -17,6 +17,11 @@ const subscriptionSelect = document.getElementById('subscriptionSelect');
 const appendIpsInput = document.getElementById('appendIps');
 const appendBtn = document.getElementById('appendBtn');
 const subscriptionContextMenu = document.getElementById('subscriptionContextMenu');
+const personalAccessKeyInput = document.getElementById('personalAccessKey');
+const saveLocalLinkInput = document.getElementById('saveLocalLink');
+const generateKeyBtn = document.getElementById('generateKeyBtn');
+const clearLocalLinksBtn = document.getElementById('clearLocalLinksBtn');
+const localLinksList = document.getElementById('localLinksList');
 const appendResult = document.getElementById('appendResult');
 
 const qrModal = document.getElementById('qrModal');
@@ -51,7 +56,15 @@ form.addEventListener('submit', async (event) => {
     preferredIps: document.getElementById('preferredIps').value,
     namePrefix: document.getElementById('namePrefix').value,
     keepOriginalHost: document.getElementById('keepOriginalHost').checked,
+    accessKey: personalAccessKeyInput.value.trim(),
   };
+
+  if (payload.accessKey.length < 8) {
+    warningBox.textContent = '请先设置自己的管理密钥（至少 8 位），以后可用它加载和管理订阅。';
+    warningBox.classList.remove('hidden');
+    personalAccessKeyInput.focus();
+    return;
+  }
 
   submitBtn.disabled = true;
   submitBtn.textContent = '生成中...';
@@ -99,6 +112,18 @@ form.addEventListener('submit', async (event) => {
     if (Array.isArray(data.warnings) && data.warnings.length) {
       warningBox.textContent = data.warnings.join('\n');
       warningBox.classList.remove('hidden');
+    }
+
+    if (saveLocalLinkInput.checked) {
+      saveLocalSubscription({
+        label: personalAccessKeyInput.value ? '我的订阅' : '新订阅',
+        id: data.shortId,
+        auto: data.urls.auto,
+        clash: data.urls.clash,
+        raw: data.urls.raw,
+        accessKey: personalAccessKeyInput.value.trim(),
+      });
+      appendResult.textContent = '✅ 订阅已生成，并已保存到本机。';
     }
 
     resultSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -301,6 +326,68 @@ appendBtn.addEventListener('click', async () => {
     appendBtn.disabled = false;
   }
 });
+
+clearLocalLinksBtn.addEventListener('click', () => {
+  if (!window.confirm('确定清空本机保存的订阅记录吗？不会删除服务器上的订阅。')) return;
+  localStorage.removeItem('cloudflaresub.savedSubscriptions');
+  renderLocalSubscriptions();
+});
+
+generateKeyBtn.addEventListener('click', () => {
+  const bytes = crypto.getRandomValues(new Uint8Array(12));
+  personalAccessKeyInput.value = Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+});
+
+localLinksList.addEventListener('click', async (event) => {
+  const button = event.target.closest('[data-local-action]');
+  if (!button) return;
+  const id = button.dataset.id;
+  const saved = readLocalSubscriptions();
+  const item = saved.find((entry) => entry.id === id);
+  if (!item) return;
+  if (button.dataset.localAction === 'delete') {
+    localStorage.setItem('cloudflaresub.savedSubscriptions', JSON.stringify(saved.filter((entry) => entry.id !== id)));
+    renderLocalSubscriptions();
+  }
+  if (button.dataset.localAction === 'copy') {
+    await navigator.clipboard.writeText(item.clash || item.auto);
+    appendResult.textContent = '✅ 已复制本机保存的 Clash 链接。';
+  }
+});
+
+function readLocalSubscriptions() {
+  try {
+    const items = JSON.parse(localStorage.getItem('cloudflaresub.savedSubscriptions') || '[]');
+    return Array.isArray(items) ? items : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveLocalSubscription(item) {
+  const saved = readLocalSubscriptions().filter((entry) => entry.id !== item.id);
+  saved.unshift({ ...item, savedAt: new Date().toISOString() });
+  localStorage.setItem('cloudflaresub.savedSubscriptions', JSON.stringify(saved.slice(0, 30)));
+  renderLocalSubscriptions();
+}
+
+function renderLocalSubscriptions() {
+  const saved = readLocalSubscriptions();
+  if (!saved.length) {
+    localLinksList.innerHTML = '<span class="hint">还没有保存的订阅。</span>';
+    return;
+  }
+  localLinksList.innerHTML = saved.map((item) => `
+    <div class="local-link-item">
+      <span>${escapeHtml(item.label || item.id)} <code>${escapeHtml(item.id)}</code></span>
+      <span class="local-link-actions">
+        <button type="button" class="secondary small" data-local-action="copy" data-id="${escapeHtml(item.id)}">复制</button>
+        <button type="button" class="secondary small" data-local-action="delete" data-id="${escapeHtml(item.id)}">移除</button>
+      </span>
+    </div>`).join('');
+}
+
+renderLocalSubscriptions();
 
 function closeQrDialog() {
   qrModal.classList.add('hidden');

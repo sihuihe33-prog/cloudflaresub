@@ -429,6 +429,7 @@ async function buildDedupHash(body) {
     preferredIps: normalizeLines(body.preferredIps || ''),
     namePrefix: String(body.namePrefix || '').trim(),
     keepOriginalHost: body.keepOriginalHost !== false,
+    accessKey: String(body.accessKey || '').trim(),
   };
   return sha256Hex(JSON.stringify(normalized));
 }
@@ -442,11 +443,12 @@ async function handleGenerate(request, env, url) {
   }
 
   const protectedUpdate = body.updateId || body.appendPreferredIps;
-  if (protectedUpdate && env.SUB_ACCESS_TOKEN) {
-    const provided = request.headers.get('x-sub-access-token') || url.searchParams.get('token') || '';
-    if (provided !== env.SUB_ACCESS_TOKEN) {
-      return json({ ok: false, error: '访问令牌无效' }, 403);
-    }
+  const providedToken = request.headers.get('x-sub-access-token') || url.searchParams.get('token') || '';
+  if (body.accessKey && String(body.accessKey).trim().length < 8) {
+    return json({ ok: false, error: '自定义密钥至少需要 8 位' }, 400);
+  }
+  if (!body.updateId && !body.appendPreferredIps && !String(body.accessKey || '').trim()) {
+    return json({ ok: false, error: '请先设置自己的管理密钥' }, 400);
   }
 
   const baseNodes = parseRawLinks(body.nodeLinks || '');
@@ -468,6 +470,8 @@ async function handleGenerate(request, env, url) {
     options,
     nodes,
   };
+  const accessKey = String(body.accessKey || '').trim();
+  if (accessKey) payload.accessKeyHash = await sha256Hex(accessKey);
 
   const dedupHash = await buildDedupHash(body);
   const dedupKey = `dedup:${dedupHash}`;
@@ -479,6 +483,10 @@ async function handleGenerate(request, env, url) {
     const existing = await env.SUB_STORE.get(`sub:${updateId}`);
     if (!existing) {
       return json({ ok: false, error: `updateId 不存在：${updateId}` }, 404);
+    }
+    const existingRecord = JSON.parse(existing);
+    if (!(await tokenMatchesRecord(existingRecord, providedToken, env))) {
+      return json({ ok: false, error: '访问令牌无效' }, 403);
     }
 
     // Append mode uses the stored nodes as the source of truth, keeps every
@@ -514,7 +522,7 @@ async function handleGenerate(request, env, url) {
     });
 
     const origin = url.origin;
-    const accessToken = env.SUB_ACCESS_TOKEN || '';
+    const accessToken = providedToken || env.SUB_ACCESS_TOKEN || '';
     const withToken = (target) =>
       `${origin}/sub/${updateId}${
         target
@@ -567,7 +575,7 @@ async function handleGenerate(request, env, url) {
   }
 
   const origin = url.origin;
-  const accessToken = env.SUB_ACCESS_TOKEN || '';
+  const accessToken = accessKey || env.SUB_ACCESS_TOKEN || '';
   const withToken = (target) =>
     `${origin}/sub/${id}${
       target
@@ -604,14 +612,14 @@ async function handleGenerate(request, env, url) {
 }
 
 async function deleteSubscription(request, url, env) {
-  const tokenCheck = validateAccessToken(url, env);
-  if (!tokenCheck.ok) return tokenCheck.response;
-
   const id = decodeURIComponent(url.pathname.slice('/api/subscriptions/'.length)).trim();
   if (!id || !/^[A-Za-z0-9]+$/.test(id)) return json({ ok: false, error: '订阅 ID 无效' }, 400);
   const key = `sub:${id}`;
   const existing = await env.SUB_STORE.get(key);
   if (!existing) return json({ ok: false, error: '订阅不存在' }, 404);
+  const record = JSON.parse(existing);
+  const provided = url.searchParams.get('token') || request.headers.get('x-sub-access-token') || '';
+  if (!(await tokenMatchesRecord(record, provided, env))) return json({ ok: false, error: '访问令牌无效' }, 403);
 
   await env.SUB_STORE.delete(key);
 
@@ -626,8 +634,8 @@ async function deleteSubscription(request, url, env) {
 }
 
 async function listSubscriptions(url, env) {
-  const tokenCheck = validateAccessToken(url, env);
-  if (!tokenCheck.ok) return tokenCheck.response;
+  const provided = url.searchParams.get('token') || '';
+  if (!provided) return text('Forbidden: invalid token', 403);
 
   const listed = await env.SUB_STORE.list({ prefix: 'sub:', limit: 100 });
   const subscriptions = (await Promise.all(
@@ -636,6 +644,7 @@ async function listSubscriptions(url, env) {
       if (!raw) return null;
       try {
         const record = JSON.parse(raw);
+        if (!(await tokenMatchesRecord(record, provided, env))) return null;
         const nodes = Array.isArray(record.nodes) ? record.nodes : [];
         const first = nodes[0] || {};
         const types = [...new Set(nodes.map((node) => node.type).filter(Boolean))].join('/') || '未知';
@@ -656,6 +665,12 @@ async function listSubscriptions(url, env) {
   return json({ ok: true, subscriptions });
 }
 
+async function tokenMatchesRecord(record, provided, env) {
+  if (!provided) return false;
+  if (env.SUB_ACCESS_TOKEN && provided === env.SUB_ACCESS_TOKEN) return true;
+  return Boolean(record?.accessKeyHash && (await sha256Hex(provided)) === record.accessKeyHash);
+}
+
 function validateAccessToken(url, env) {
   const expected = env.SUB_ACCESS_TOKEN;
   if (!expected) return { ok: true };
@@ -667,9 +682,6 @@ function validateAccessToken(url, env) {
 }
 
 async function handleSub(url, env) {
-  const tokenCheck = validateAccessToken(url, env);
-  if (!tokenCheck.ok) return tokenCheck.response;
-
   const id = url.pathname.split('/').pop();
   if (!id) return text('missing id', 400);
 
@@ -677,6 +689,9 @@ async function handleSub(url, env) {
   if (!raw) return text('not found', 404);
 
   const record = JSON.parse(raw);
+  const provided = url.searchParams.get('token') || '';
+  if (!(await tokenMatchesRecord(record, provided, env))) return text('Forbidden: invalid token', 403);
+
   const nodes = record.nodes || [];
   const target = (url.searchParams.get('target') || 'raw').toLowerCase();
 
@@ -685,7 +700,7 @@ async function handleSub(url, env) {
   }
   if (target === 'surge') {
     return text(
-      renderSurge(nodes, url.origin + url.pathname, env.SUB_ACCESS_TOKEN || ''),
+      renderSurge(nodes, url.origin + url.pathname, provided || env.SUB_ACCESS_TOKEN || ''),
       200,
       'text/plain; charset=utf-8',
     );

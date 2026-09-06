@@ -73,6 +73,20 @@ cf.example.com:443#US-Edge"
             </div>
           </div>
 
+          <div class="link-management">
+            <p class="eyebrow">4. 链接管理（可选）</p>
+            <label for="personalAccessKey">自己设置的管理密钥</label>
+            <div class="key-row">
+              <input id="personalAccessKey" name="personalAccessKey" type="password" autocomplete="new-password" placeholder="用于以后加载、追加或删除此订阅" />
+              <button id="generateKeyBtn" type="button" class="secondary small">随机生成</button>
+            </div>
+            <label class="save-link-option" for="saveLocalLink">
+              <input id="saveLocalLink" name="saveLocalLink" type="checkbox" />
+              <span>保存链接到本机，方便以后追加 IP</span>
+            </label>
+            <p class="hint">不勾选则不写入本机；密钥不会显示在页面上，只用于保护你的订阅。</p>
+          </div>
+
           <div class="actions">
             <button id="submitBtn" type="submit">生成订阅</button>
             <button id="fillDemoBtn" type="button" class="secondary">填入演示数据</button>
@@ -86,9 +100,9 @@ cf.example.com:443#US-Edge"
             <p class="section-desc">选择已有订阅并追加优选 IP，原订阅链接不会改变。</p>
           </div>
           <div>
-            <label for="accessToken">访问令牌</label>
-            <input id="accessToken" type="password" autocomplete="off" placeholder="填入 SUB_ACCESS_TOKEN" />
-            <p class="hint">令牌只保存在当前页面会话，不会写入订阅内容。</p>
+            <label for="accessToken">订阅管理密钥</label>
+            <input id="accessToken" type="password" autocomplete="off" placeholder="填入你生成订阅时设置的密钥" />
+            <p class="hint">用你自己的密钥加载订阅；旧版 RN 订阅仍兼容原管理密钥。</p>
           </div>
           <div class="actions">
             <button id="loadSubscriptionsBtn" type="button">加载已有订阅</button>
@@ -117,6 +131,15 @@ cf.example.com:443#US-Edge"
           </div>
           <button id="appendBtn" type="button" disabled>追加 IP，保持原链接</button>
           <div id="appendResult" class="hint"></div>
+          <div id="localLinkVault" class="local-link-vault">
+            <div class="vault-head">
+              <strong>本机已保存的链接</strong>
+              <button id="clearLocalLinksBtn" type="button" class="secondary small">清空本机记录</button>
+            </div>
+            <div id="localLinksList" class="local-links-list">
+              <span class="hint">还没有保存的订阅。</span>
+            </div>
+          </div>
         </aside>
 
         <aside class="card stack-md tips">

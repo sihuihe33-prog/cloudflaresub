@@ -1,0 +1,14 @@
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+const here = new URL(import.meta.url).pathname.replace(/^\/(?=[A-Za-z]:)/, '');
+const root = path.resolve(path.dirname(here), '..');
+const html = readFileSync(path.join(root, 'public', 'index.html'), 'utf8');
+const js = readFileSync(path.join(root, 'public', 'app.js'), 'utf8');
+const worker = readFileSync(path.join(root, 'src', 'worker.js'), 'utf8');
+if (!html.includes('personalAccessKey')) throw new Error('missing personal key field');
+if (!html.includes('saveLocalLink')) throw new Error('missing local save option');
+if (!html.includes('localLinkVault')) throw new Error('missing local link vault');
+if (!js.includes('localStorage')) throw new Error('missing local storage logic');
+if (!worker.includes('accessKeyHash')) throw new Error('missing per-subscription key hash');
+if (!worker.includes('tokenMatchesRecord')) throw new Error('missing per-subscription auth');
+console.log('personal key and local link feature test passed');
