@@ -79,6 +79,37 @@ cf.example.com:443#US-Edge"
           </div>
         </form>
 
+        <aside id="existingSubscription" class="card stack-md existing-subscriptions">
+          <div>
+            <p class="eyebrow">原链接更新</p>
+            <h2>在已有订阅上追加 IP</h2>
+            <p class="section-desc">选择已有订阅并追加优选 IP，原订阅链接不会改变。</p>
+          </div>
+          <div>
+            <label for="accessToken">访问令牌</label>
+            <input id="accessToken" type="password" autocomplete="off" placeholder="填入 SUB_ACCESS_TOKEN" />
+            <p class="hint">令牌只保存在当前页面会话，不会写入订阅内容。</p>
+          </div>
+          <div class="actions">
+            <button id="loadSubscriptionsBtn" type="button">加载已有订阅</button>
+          </div>
+          <div>
+            <label for="subscriptionSelect">选择订阅</label>
+            <select id="subscriptionSelect" disabled>
+              <option value="">请先加载</option>
+            </select>
+          </div>
+          <div>
+            <label for="appendIps">新增优选 IP / 域名</label>
+            <textarea id="appendIps" rows="5" placeholder="一行一个，例如：
+104.16.1.2#HK-13
+104.17.2.3#US-14"></textarea>
+            <p class="hint">只填新增地址；已有节点会自动保留并去重。</p>
+          </div>
+          <button id="appendBtn" type="button" disabled>追加 IP，保持原链接</button>
+          <div id="appendResult" class="hint"></div>
+        </aside>
+
         <aside class="card stack-md tips">
           <h2>说明</h2>
           <ul>

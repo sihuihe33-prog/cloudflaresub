@@ -11,6 +11,13 @@ const clashUrl = document.getElementById('clashUrl');
 const surgeUrl = document.getElementById('surgeUrl');
 const emptyState = document.getElementById('emptyState');
 
+const accessTokenInput = document.getElementById('accessToken');
+const loadSubscriptionsBtn = document.getElementById('loadSubscriptionsBtn');
+const subscriptionSelect = document.getElementById('subscriptionSelect');
+const appendIpsInput = document.getElementById('appendIps');
+const appendBtn = document.getElementById('appendBtn');
+const appendResult = document.getElementById('appendResult');
+
 const qrModal = document.getElementById('qrModal');
 const qrCanvas = document.getElementById('qrCanvas');
 const qrText = document.getElementById('qrText');
@@ -161,6 +168,63 @@ document.addEventListener('click', async (event) => {
 });
 
 closeQrModal.addEventListener('click', closeQrDialog);
+
+loadSubscriptionsBtn.addEventListener('click', async () => {
+  const token = accessTokenInput.value.trim();
+  if (!token) {
+    appendResult.textContent = '请先填写访问令牌。';
+    return;
+  }
+  appendResult.textContent = '加载中...';
+  try {
+    const response = await fetch(`/api/subscriptions?token=${encodeURIComponent(token)}`);
+    const data = await response.json();
+    if (!response.ok || !data.ok) throw new Error(data.error || '加载失败');
+    subscriptionSelect.innerHTML = '<option value="">请选择已有订阅</option>';
+    for (const item of data.subscriptions) {
+      const option = document.createElement('option');
+      option.value = item.id;
+      option.textContent = `${item.label}（${item.nodeCount} 个节点）`;
+      subscriptionSelect.appendChild(option);
+    }
+    subscriptionSelect.disabled = false;
+    appendResult.textContent = `已加载 ${data.subscriptions.length} 条订阅。`;
+  } catch (error) {
+    appendResult.textContent = error.message || '加载失败';
+  }
+});
+
+subscriptionSelect.addEventListener('change', () => {
+  appendBtn.disabled = !subscriptionSelect.value;
+  appendResult.textContent = '';
+});
+
+appendBtn.addEventListener('click', async () => {
+  const token = accessTokenInput.value.trim();
+  const updateId = subscriptionSelect.value;
+  const appendPreferredIps = appendIpsInput.value.trim();
+  if (!token || !updateId || !appendPreferredIps) {
+    appendResult.textContent = '请填写令牌、选择订阅并填入新增 IP。';
+    return;
+  }
+  appendBtn.disabled = true;
+  appendResult.textContent = '更新中...';
+  try {
+    const response = await fetch('/api/generate', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-sub-access-token': token },
+      body: JSON.stringify({ updateId, appendPreferredIps, keepOriginalHost: true }),
+    });
+    const data = await response.json();
+    if (!response.ok || !data.ok) throw new Error(data.error || '更新失败');
+    appendResult.textContent = `✅ 已追加 ${data.appendedCount} 个 IP，原链接保持不变：${data.shortId}`;
+    appendIpsInput.value = '';
+  } catch (error) {
+    appendResult.textContent = `❌ ${error.message || '更新失败'}`;
+  } finally {
+    appendBtn.disabled = false;
+  }
+});
 
 function closeQrDialog() {
   qrModal.classList.add('hidden');

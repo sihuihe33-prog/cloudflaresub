@@ -441,11 +441,19 @@ async function handleGenerate(request, env, url) {
     return json({ ok: false, error: '请求体不是合法 JSON' }, 400);
   }
 
+  const protectedUpdate = body.updateId || body.appendPreferredIps;
+  if (protectedUpdate && env.SUB_ACCESS_TOKEN) {
+    const provided = request.headers.get('x-sub-access-token') || url.searchParams.get('token') || '';
+    if (provided !== env.SUB_ACCESS_TOKEN) {
+      return json({ ok: false, error: '访问令牌无效' }, 403);
+    }
+  }
+
   const baseNodes = parseRawLinks(body.nodeLinks || '');
   const preferredEndpoints = parsePreferredEndpoints(body.preferredIps || '');
 
-  if (!baseNodes.length) return json({ ok: false, error: '没有识别到可用节点' }, 400);
-  if (!preferredEndpoints.length) return json({ ok: false, error: '没有识别到可用优选地址' }, 400);
+  if (!baseNodes.length && !body.updateId) return json({ ok: false, error: '没有识别到可用节点' }, 400);
+  if (!preferredEndpoints.length && !String(body.appendPreferredIps || '').trim()) return json({ ok: false, error: '没有识别到可用优选地址' }, 400);
 
   const options = {
     namePrefix: body.namePrefix || '',
@@ -454,7 +462,7 @@ async function handleGenerate(request, env, url) {
 
   const nodes = buildNodes(baseNodes, preferredEndpoints, options);
 
-  const payload = {
+  let payload = {
     version: 1,
     createdAt: new Date().toISOString(),
     options,
@@ -471,6 +479,31 @@ async function handleGenerate(request, env, url) {
     const existing = await env.SUB_STORE.get(`sub:${updateId}`);
     if (!existing) {
       return json({ ok: false, error: `updateId 不存在：${updateId}` }, 404);
+    }
+
+    // Append mode uses the stored nodes as the source of truth, keeps every
+    // existing node byte-for-byte, and creates only nodes for new endpoints.
+    let appendedCount = 0;
+    if (String(body.appendPreferredIps || '').trim()) {
+      const oldRecord = JSON.parse(existing);
+      const oldNodes = Array.isArray(oldRecord.nodes) ? oldRecord.nodes : [];
+      const oldKeys = new Set(oldNodes.map((node) => `${node.server}:${node.port}`));
+      const appendEndpoints = parsePreferredEndpoints(body.appendPreferredIps)
+        .filter((endpoint) => !oldKeys.has(`${endpoint.server}:${endpoint.port || oldNodes[0]?.port || 443}`));
+      const template = oldNodes[0];
+      if (!template) return json({ ok: false, error: '已有订阅没有可用节点' }, 400);
+      const appendedNodes = buildNodes([template], appendEndpoints, {
+        ...oldRecord.options,
+        namePrefix: '',
+        keepOriginalHost: oldRecord.options?.keepOriginalHost !== false,
+      });
+      payload = {
+        ...oldRecord,
+        createdAt: new Date().toISOString(),
+        nodes: [...oldNodes, ...appendedNodes],
+      };
+      appendedCount = appendedNodes.length;
+      if (!appendedCount) return json({ ok: false, error: '新增 IP 都已存在，未发生变化' }, 400);
     }
     const ttl = 60 * 60 * 24 * 7; // 7天，与原逻辑一致
     await env.SUB_STORE.put(`sub:${updateId}`, JSON.stringify(payload), {
@@ -493,6 +526,7 @@ async function handleGenerate(request, env, url) {
       ok: true,
       storage: 'kv',
       updated: true,
+      appendedCount,
       shortId: updateId,
       urls: {
         auto: withToken(''),
@@ -503,9 +537,9 @@ async function handleGenerate(request, env, url) {
       counts: {
         inputNodes: baseNodes.length,
         preferredEndpoints: preferredEndpoints.length,
-        outputNodes: nodes.length,
+        outputNodes: payload.nodes.length,
       },
-      preview: nodes.slice(0, 20).map((node) => ({
+      preview: payload.nodes.slice(0, 20).map((node) => ({
         name: node.name,
         type: node.type,
         server: node.server,
@@ -569,6 +603,37 @@ async function handleGenerate(request, env, url) {
   });
 }
 
+async function listSubscriptions(url, env) {
+  const tokenCheck = validateAccessToken(url, env);
+  if (!tokenCheck.ok) return tokenCheck.response;
+
+  const listed = await env.SUB_STORE.list({ prefix: 'sub:', limit: 100 });
+  const subscriptions = (await Promise.all(
+    listed.keys.map(async (key) => {
+      const raw = await env.SUB_STORE.get(key.name);
+      if (!raw) return null;
+      try {
+        const record = JSON.parse(raw);
+        const nodes = Array.isArray(record.nodes) ? record.nodes : [];
+        const first = nodes[0] || {};
+        const types = [...new Set(nodes.map((node) => node.type).filter(Boolean))].join('/') || '未知';
+        return {
+          id: key.name.slice('sub:'.length),
+          label: first.name || `${types} 订阅`,
+          nodeCount: nodes.length,
+          types,
+          createdAt: record.createdAt || '',
+        };
+      } catch {
+        return null;
+      }
+    }),
+  )).filter(Boolean);
+
+  subscriptions.sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+  return json({ ok: true, subscriptions });
+}
+
 function validateAccessToken(url, env) {
   const expected = env.SUB_ACCESS_TOKEN;
   if (!expected) return { ok: true };
@@ -622,6 +687,10 @@ export default {
 
     if (request.method === 'POST' && url.pathname === '/api/generate') {
       return handleGenerate(request, env, url);
+    }
+
+    if (request.method === 'GET' && url.pathname === '/api/subscriptions') {
+      return listSubscriptions(url, env);
     }
 
     if (request.method === 'GET' && url.pathname.startsWith('/sub/')) {
