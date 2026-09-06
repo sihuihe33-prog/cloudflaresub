@@ -99,7 +99,12 @@ cf.example.com:443#US-Edge"
               <select id="subscriptionSelect" multiple size="6" disabled>
                 <option value="">请先加载</option>
               </select>
-              <button id="deleteSubscriptionBtn" type="button" class="danger" disabled>删除选中订阅</button>
+              <div id="subscriptionContextMenu" class="subscription-context-menu hidden" role="menu">
+                <button type="button" data-sub-action="delete">删除选中订阅</button>
+                <button type="button" data-sub-action="copy">复制选中订阅链接</button>
+                <button type="button" data-sub-action="refresh">刷新订阅列表</button>
+                <button type="button" data-sub-action="clear">清空选择</button>
+              </div>
             </div>
             <p class="hint">删除时可按住 Ctrl 多选；追加 IP 时请只选择一条。</p>
           </div>

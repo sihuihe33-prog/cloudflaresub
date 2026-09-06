@@ -173,6 +173,35 @@ form.card,
   background: rgba(185, 28, 28, 0.42);
 }
 
+.existing-subscriptions .subscription-context-menu {
+  position: fixed;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 220px;
+  padding: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 14px;
+  background: rgba(15, 23, 42, 0.98);
+  box-shadow: 0 18px 40px rgba(2, 6, 23, 0.5);
+}
+
+.existing-subscriptions .subscription-context-menu button {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  font-size: 0.9rem;
+}
+
+.existing-subscriptions .subscription-context-menu button:hover {
+  background: rgba(96, 165, 250, 0.16);
+  transform: none;
+}
+
 .existing-subscriptions #appendResult {
   min-height: 1.5em;
   overflow-wrap: anywhere;
