@@ -201,6 +201,13 @@ subscriptionSelect.addEventListener('change', () => {
   appendResult.textContent = selectedCount > 1 ? '已多选，可右键批量删除；追加 IP 时请只保留一条。' : '';
 });
 
+let scrollbarTimer;
+subscriptionSelect.addEventListener('scroll', () => {
+  subscriptionSelect.classList.add('scrolling');
+  clearTimeout(scrollbarTimer);
+  scrollbarTimer = setTimeout(() => subscriptionSelect.classList.remove('scrolling'), 700);
+});
+
 subscriptionSelect.addEventListener('contextmenu', (event) => {
   event.preventDefault();
   subscriptionContextMenu.classList.remove('hidden');

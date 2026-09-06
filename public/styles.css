@@ -143,6 +143,26 @@ form.card,
 .existing-subscriptions select[multiple] {
   min-height: 168px;
   padding: 8px;
+  scrollbar-width: none;
+}
+
+.existing-subscriptions select[multiple].scrolling {
+  scrollbar-width: thin;
+}
+
+.existing-subscriptions select[multiple]::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+.existing-subscriptions select[multiple].scrolling::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.existing-subscriptions select[multiple].scrolling::-webkit-scrollbar-thumb {
+  border-radius: 8px;
+  background: rgba(148, 163, 184, 0.55);
 }
 
 .existing-subscriptions select:focus,
