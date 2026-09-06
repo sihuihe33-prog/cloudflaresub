@@ -111,9 +111,50 @@ p {
 
 form.card,
 .tips,
-#resultSection {
+#resultSection,
+.existing-subscriptions {
   padding: 24px;
 }
+
+.existing-subscriptions {
+  align-self: start;
+  border-color: rgba(52, 211, 153, 0.2);
+  background: rgba(15, 23, 42, 0.88);
+}
+
+.existing-subscriptions h2 {
+  margin-bottom: 10px;
+  font-size: 1.35rem;
+}
+
+.existing-subscriptions select,
+.existing-subscriptions input[type="password"] {
+  width: 100%;
+  min-height: 48px;
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: rgba(15, 23, 42, 0.9);
+  color: var(--text);
+  padding: 12px 14px;
+  font: inherit;
+  outline: none;
+}
+
+.existing-subscriptions select:focus,
+.existing-subscriptions input[type="password"]:focus {
+  border-color: rgba(96, 165, 250, 0.72);
+  box-shadow: 0 0 0 4px rgba(96, 165, 250, 0.12);
+}
+
+.existing-subscriptions #appendBtn {
+  width: 100%;
+}
+
+.existing-subscriptions #appendResult {
+  min-height: 1.5em;
+  overflow-wrap: anywhere;
+}
+
 
 label {
   display: block;
@@ -322,14 +363,16 @@ button.small {
   .card,
   form.card,
   .tips,
-  #resultSection {
+  #resultSection,
+  .existing-subscriptions {
     border-radius: 16px;
   }
 
   .hero,
   form.card,
   .tips,
-  #resultSection {
+  #resultSection,
+  .existing-subscriptions {
     padding: 18px;
   }
 
