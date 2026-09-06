@@ -109,6 +109,10 @@ p {
   margin-top: 14px;
 }
 
+.tips {
+  grid-column: 2;
+}
+
 form.card,
 .tips,
 #resultSection,
@@ -492,6 +496,10 @@ button.small {
   .hero,
   .two-col {
     grid-template-columns: 1fr;
+  }
+
+  .tips {
+    grid-column: auto;
   }
 
   .section-head {

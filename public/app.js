@@ -14,6 +14,9 @@ const emptyState = document.getElementById('emptyState');
 const accessTokenInput = document.getElementById('accessToken');
 const loadSubscriptionsBtn = document.getElementById('loadSubscriptionsBtn');
 const subscriptionSelect = document.getElementById('subscriptionSelect');
+const otherSubscriptionSelect = document.getElementById('otherSubscriptionSelect');
+const otherSubscriptionsToggle = document.getElementById('otherSubscriptionsToggle');
+const otherSubscriptionsPanel = document.getElementById('otherSubscriptionsPanel');
 const appendIpsInput = document.getElementById('appendIps');
 const appendBtn = document.getElementById('appendBtn');
 const subscriptionContextMenu = document.getElementById('subscriptionContextMenu');
@@ -206,39 +209,62 @@ loadSubscriptionsBtn.addEventListener('click', async () => {
     const response = await fetch(`/api/subscriptions?token=${encodeURIComponent(token)}`);
     const data = await response.json();
     if (!response.ok || !data.ok) throw new Error(data.error || '加载失败');
-    subscriptionSelect.innerHTML = '<option value="" disabled hidden>请选择已有订阅</option>';
-    for (const item of data.subscriptions) {
-      const option = document.createElement('option');
-      option.value = item.id;
-      option.textContent = `${item.label}（${item.nodeCount} 个节点）`;
-      subscriptionSelect.appendChild(option);
-    }
-    subscriptionSelect.disabled = false;
-    appendResult.textContent = `已加载 ${data.subscriptions.length} 条订阅。`;
+    const adminIds = new Set(['9oeChZMJix', 'wcMiHZx54Z']);
+    const adminItems = data.subscriptions.filter((item) => adminIds.has(item.id));
+    const otherItems = data.subscriptions.filter((item) => !adminIds.has(item.id));
+    const fillSelect = (select, items, emptyText) => {
+      select.innerHTML = `<option value="" disabled hidden>${emptyText}</option>`;
+      for (const item of items) {
+        const option = document.createElement('option');
+        option.value = item.id;
+        option.textContent = `${item.label}（${item.nodeCount} 个节点）`;
+        select.appendChild(option);
+      }
+      select.disabled = false;
+    };
+    fillSelect(subscriptionSelect, adminItems, '暂无置顶订阅');
+    fillSelect(otherSubscriptionSelect, otherItems, '暂无其他订阅');
+    otherSubscriptionsToggle.querySelector('span').textContent = `展开（${otherItems.length}）`;
+    subscriptionSelect.disabled = adminItems.length === 0;
+    otherSubscriptionSelect.disabled = otherItems.length === 0;
+    appendResult.textContent = `已加载 ${data.subscriptions.length} 条订阅，其中我的订阅 ${adminItems.length} 条。`;
   } catch (error) {
     appendResult.textContent = error.message || '加载失败';
   }
 });
 
-subscriptionSelect.addEventListener('change', () => {
-  const selectedCount = subscriptionSelect.selectedOptions.length;
+otherSubscriptionsToggle.addEventListener('click', () => {
+  const isHidden = otherSubscriptionsPanel.classList.toggle('hidden');
+  otherSubscriptionsToggle.querySelector('span').textContent = isHidden ? '展开' : '收起';
+});
+
+function getSelectedOptions() {
+  return [...subscriptionSelect.selectedOptions, ...otherSubscriptionSelect.selectedOptions];
+}
+
+function updateSelectionState() {
+  const selectedCount = getSelectedOptions().length;
   appendBtn.disabled = selectedCount !== 1;
   appendResult.textContent = selectedCount > 1 ? '已多选，可右键批量删除；追加 IP 时请只保留一条。' : '';
-});
+}
+
+subscriptionSelect.addEventListener('change', updateSelectionState);
+otherSubscriptionSelect.addEventListener('change', updateSelectionState);
 
 let scrollbarTimer;
-subscriptionSelect.addEventListener('scroll', () => {
-  subscriptionSelect.classList.add('scrolling');
-  clearTimeout(scrollbarTimer);
-  scrollbarTimer = setTimeout(() => subscriptionSelect.classList.remove('scrolling'), 700);
-});
-
-subscriptionSelect.addEventListener('contextmenu', (event) => {
-  event.preventDefault();
-  subscriptionContextMenu.classList.remove('hidden');
-  subscriptionContextMenu.style.left = `${Math.min(event.clientX, window.innerWidth - 230)}px`;
-  subscriptionContextMenu.style.top = `${Math.min(event.clientY, window.innerHeight - 190)}px`;
-});
+for (const select of [subscriptionSelect, otherSubscriptionSelect]) {
+  select.addEventListener('scroll', () => {
+    select.classList.add('scrolling');
+    clearTimeout(scrollbarTimer);
+    scrollbarTimer = setTimeout(() => select.classList.remove('scrolling'), 700);
+  });
+  select.addEventListener('contextmenu', (event) => {
+    event.preventDefault();
+    subscriptionContextMenu.classList.remove('hidden');
+    subscriptionContextMenu.style.left = `${Math.min(event.clientX, window.innerWidth - 230)}px`;
+    subscriptionContextMenu.style.top = `${Math.min(event.clientY, window.innerHeight - 190)}px`;
+  });
+}
 
 document.addEventListener('click', (event) => {
   if (!event.target.closest('#subscriptionContextMenu')) subscriptionContextMenu.classList.add('hidden');
@@ -253,13 +279,14 @@ subscriptionContextMenu.addEventListener('click', async (event) => {
   if (action === 'refresh') loadSubscriptionsBtn.click();
   if (action === 'clear') {
     subscriptionSelect.selectedIndex = -1;
-    subscriptionSelect.dispatchEvent(new Event('change'));
+    otherSubscriptionSelect.selectedIndex = -1;
+    updateSelectionState();
   }
 });
 
 async function deleteSelectedSubscriptions() {
   const token = accessTokenInput.value.trim();
-  const selected = [...subscriptionSelect.selectedOptions];
+  const selected = getSelectedOptions();
   if (!token || !selected.length) {
     appendResult.textContent = '请先选择至少一条订阅。';
     return;
@@ -277,7 +304,8 @@ async function deleteSelectedSubscriptions() {
     }));
     for (const option of results) option.remove();
     subscriptionSelect.selectedIndex = -1;
-    appendBtn.disabled = true;
+    otherSubscriptionSelect.selectedIndex = -1;
+    updateSelectionState();
     appendResult.textContent = `✅ 已批量删除 ${results.length} 条订阅`;
   } catch (error) {
     appendResult.textContent = `❌ ${error.message || '批量删除失败'}`;
@@ -286,7 +314,7 @@ async function deleteSelectedSubscriptions() {
 
 async function copySelectedSubscriptionLinks() {
   const token = accessTokenInput.value.trim();
-  const selected = [...subscriptionSelect.selectedOptions];
+  const selected = getSelectedOptions();
   if (!token || !selected.length) {
     appendResult.textContent = '请先选择至少一条订阅。';
     return;
@@ -302,7 +330,8 @@ async function copySelectedSubscriptionLinks() {
 
 appendBtn.addEventListener('click', async () => {
   const token = accessTokenInput.value.trim();
-  const updateId = subscriptionSelect.value;
+  const selected = getSelectedOptions();
+  const updateId = selected[0]?.value;
   const appendPreferredIps = appendIpsInput.value.trim();
   if (!token || !updateId || !appendPreferredIps) {
     appendResult.textContent = '请填写令牌、选择订阅并填入新增 IP。';
