@@ -140,6 +140,11 @@ form.card,
   outline: none;
 }
 
+.existing-subscriptions select[multiple] {
+  min-height: 168px;
+  padding: 8px;
+}
+
 .existing-subscriptions select:focus,
 .existing-subscriptions input[type="password"]:focus {
   border-color: rgba(96, 165, 250, 0.72);

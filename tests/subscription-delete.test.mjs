@@ -8,6 +8,7 @@ const js = readFileSync(path.join(root, 'public', 'app.js'), 'utf8');
 const worker = readFileSync(path.join(root, 'src', 'worker.js'), 'utf8');
 
 if (!html.includes('deleteSubscriptionBtn')) throw new Error('missing delete subscription button');
+if (!html.includes('multiple')) throw new Error('subscription selector is not multi-select');
 if (!js.includes('/api/subscriptions/')) throw new Error('missing delete subscription request');
 if (!worker.includes('deleteSubscription')) throw new Error('worker lacks subscription deletion');
 if (!worker.includes('env.SUB_STORE.delete')) throw new Error('worker lacks KV delete');

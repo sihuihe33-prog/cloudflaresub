@@ -196,33 +196,37 @@ loadSubscriptionsBtn.addEventListener('click', async () => {
 });
 
 subscriptionSelect.addEventListener('change', () => {
-  appendBtn.disabled = !subscriptionSelect.value;
-  deleteSubscriptionBtn.disabled = !subscriptionSelect.value;
-  appendResult.textContent = '';
+  const selectedCount = subscriptionSelect.selectedOptions.length;
+  appendBtn.disabled = selectedCount !== 1;
+  deleteSubscriptionBtn.disabled = selectedCount === 0;
+  appendResult.textContent = selectedCount > 1 ? '已多选，可批量删除；追加 IP 时请只保留一条。' : '';
 });
 
 deleteSubscriptionBtn.addEventListener('click', async () => {
   const token = accessTokenInput.value.trim();
-  const updateId = subscriptionSelect.value;
-  if (!token || !updateId) return;
-  const label = subscriptionSelect.options[subscriptionSelect.selectedIndex]?.textContent || updateId;
-  if (!window.confirm(`确定删除「${label}」吗？删除后此订阅链接将失效，无法恢复。`)) return;
+  const selected = [...subscriptionSelect.selectedOptions];
+  if (!token || !selected.length) return;
+  const labels = selected.map((option) => option.textContent).join('\n');
+  if (!window.confirm(`确定删除以下 ${selected.length} 条订阅吗？删除后链接将失效，无法恢复。\n\n${labels}`)) return;
 
   deleteSubscriptionBtn.disabled = true;
-  appendResult.textContent = '删除中...';
+  appendResult.textContent = `正在删除 ${selected.length} 条订阅...`;
   try {
-    const response = await fetch(`/api/subscriptions/${encodeURIComponent(updateId)}?token=${encodeURIComponent(token)}`, {
-      method: 'DELETE',
-    });
-    const data = await response.json();
-    if (!response.ok || !data.ok) throw new Error(data.error || '删除失败');
-    subscriptionSelect.querySelector(`option[value="${CSS.escape(updateId)}"]`)?.remove();
+    const results = await Promise.all(selected.map(async (option) => {
+      const response = await fetch(`/api/subscriptions/${encodeURIComponent(option.value)}?token=${encodeURIComponent(token)}`, {
+        method: 'DELETE',
+      });
+      const data = await response.json();
+      if (!response.ok || !data.ok) throw new Error(data.error || `${option.value} 删除失败`);
+      return option;
+    }));
+    for (const option of results) option.remove();
     subscriptionSelect.value = '';
     appendBtn.disabled = true;
-    appendResult.textContent = `✅ 已删除 ${updateId}`;
+    appendResult.textContent = `✅ 已批量删除 ${results.length} 条订阅`;
   } catch (error) {
-    appendResult.textContent = `❌ ${error.message || '删除失败'}`;
-    deleteSubscriptionBtn.disabled = false;
+    appendResult.textContent = `❌ ${error.message || '批量删除失败'}`;
+    deleteSubscriptionBtn.disabled = subscriptionSelect.selectedOptions.length === 0;
   }
 });
 
