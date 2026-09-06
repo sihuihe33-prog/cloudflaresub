@@ -464,6 +464,59 @@ async function handleGenerate(request, env, url) {
   const dedupHash = await buildDedupHash(body);
   const dedupKey = `dedup:${dedupHash}`;
 
+  // In-place update: when the request carries updateId and that id exists,
+  // rewrite the KV record under the SAME id so the subscription link never changes.
+  const updateId = String(body.updateId || '').trim();
+  if (updateId) {
+    const existing = await env.SUB_STORE.get(`sub:${updateId}`);
+    if (!existing) {
+      return json({ ok: false, error: `updateId 不存在：${updateId}` }, 404);
+    }
+    const ttl = 60 * 60 * 24 * 7; // 7天，与原逻辑一致
+    await env.SUB_STORE.put(`sub:${updateId}`, JSON.stringify(payload), {
+      expirationTtl: ttl,
+    });
+    await env.SUB_STORE.put(dedupKey, updateId, {
+      expirationTtl: ttl,
+    });
+
+    const origin = url.origin;
+    const accessToken = env.SUB_ACCESS_TOKEN || '';
+    const withToken = (target) =>
+      `${origin}/sub/${updateId}${
+        target
+          ? `?target=${target}&token=${encodeURIComponent(accessToken)}`
+          : `?token=${encodeURIComponent(accessToken)}`
+      }`;
+
+    return json({
+      ok: true,
+      storage: 'kv',
+      updated: true,
+      shortId: updateId,
+      urls: {
+        auto: withToken(''),
+        raw: withToken('raw'),
+        clash: withToken('clash'),
+        surge: withToken('surge'),
+      },
+      counts: {
+        inputNodes: baseNodes.length,
+        preferredEndpoints: preferredEndpoints.length,
+        outputNodes: nodes.length,
+      },
+      preview: nodes.slice(0, 20).map((node) => ({
+        name: node.name,
+        type: node.type,
+        server: node.server,
+        port: node.port,
+        host: node.host || '',
+        sni: node.sni || '',
+      })),
+      warnings: accessToken ? [] : ['未检测到 SUB_ACCESS_TOKEN，订阅链接将没有第二层访问保护。'],
+    });
+  }
+
   let id = await env.SUB_STORE.get(dedupKey);
 
   if (!id) {
