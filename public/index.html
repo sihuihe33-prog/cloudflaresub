@@ -34,6 +34,16 @@
       <section class="grid two-col">
         <form id="generator-form" class="card stack-lg">
           <div>
+            <label for="subscriptionName">固定订阅名称</label>
+            <input id="subscriptionName" name="subscriptionName" type="text" value="RN443" maxlength="64" required />
+            <p class="hint">导入客户端时使用此名称；与下方节点备注前缀分开设置。</p>
+          </div>
+          <div>
+            <label for="existingUrl">更新已有订阅链接（可选）</label>
+            <input id="existingUrl" name="existingUrl" type="url" autocomplete="off" spellcheck="false" placeholder="粘贴本站原订阅的完整链接；留空则新建" />
+            <p class="hint">更新时粘贴原链接，并填写主节点及最新 IP。新建后此处自动填入链接，后续可直接更新。链接含访问凭据，请自行妥善保存。</p>
+          </div>
+          <div>
             <label for="nodeLinks">1. 粘贴节点链接</label>
             <textarea
               id="nodeLinks"
@@ -85,7 +95,7 @@ cf.example.com:443#US-Edge"
             <li>不会帮你找优选 IP，只负责把你现成的优选 IP 替换进节点。</li>
             <li>生成的链接是“同一份节点内容”的不同导出格式，分别给不同客户端使用。</li>
             <li>推荐勾选“保留原 Host / SNI”，这样更适合 Cloudflare CDN 场景。</li>
-            <li>订阅链接里的节点信息会通过服务端密钥加密，请不要把链接公开分享。</li>
+            <li>新建或更新后的订阅长期保存；链接含独立访问凭据，可用于读取和更新，请勿公开分享。</li>
           </ul>
 
           <div class="client-box">

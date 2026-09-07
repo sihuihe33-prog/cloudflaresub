@@ -10,6 +10,13 @@ const rawUrl = document.getElementById('rawUrl');
 const clashUrl = document.getElementById('clashUrl');
 const surgeUrl = document.getElementById('surgeUrl');
 const emptyState = document.getElementById('emptyState');
+const existingUrl = document.getElementById('existingUrl');
+const subscriptionName = document.getElementById('subscriptionName');
+
+function updateSubmitLabel() {
+  submitBtn.textContent = existingUrl.value.trim() ? '更新订阅' : '生成订阅';
+}
+existingUrl.addEventListener('input', updateSubmitLabel);
 
 const qrModal = document.getElementById('qrModal');
 const qrCanvas = document.getElementById('qrCanvas');
@@ -27,6 +34,9 @@ const demoIps = [
 ].join('\n');
 
 fillDemoBtn.addEventListener('click', () => {
+  existingUrl.value = '';
+  subscriptionName.value = '演示订阅';
+  updateSubmitLabel();
   document.getElementById('nodeLinks').value = demoVmess;
   document.getElementById('preferredIps').value = demoIps;
   document.getElementById('namePrefix').value = 'CF';
@@ -39,6 +49,7 @@ form.addEventListener('submit', async (event) => {
   previewBody.innerHTML = '';
 
   const payload = {
+    subscriptionName: subscriptionName.value.trim(),
     nodeLinks: document.getElementById('nodeLinks').value,
     preferredIps: document.getElementById('preferredIps').value,
     namePrefix: document.getElementById('namePrefix').value,
@@ -49,11 +60,24 @@ form.addEventListener('submit', async (event) => {
   submitBtn.textContent = '生成中...';
 
   try {
+    const headers = { 'content-type': 'application/json' };
+    if (existingUrl.value.trim()) {
+      let old;
+      try { old = new URL(existingUrl.value.trim()); } catch {
+        throw new Error('请粘贴完整的原订阅链接');
+      }
+      const match = old.pathname.match(/^\/sub\/([A-Za-z0-9]{1,64})$/);
+      if (old.origin !== window.location.origin || !match || old.username || old.password) {
+        throw new Error('请使用本站生成的原订阅链接');
+      }
+      const token = old.searchParams.get('token');
+      if (!token) throw new Error('原链接缺少访问凭据，请复制完整链接；无凭据的旧订阅需重新创建');
+      payload.updateId = match[1];
+      headers['x-sub-access-token'] = token;
+    }
     const response = await fetch('/api/generate', {
       method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-      },
+      headers,
       body: JSON.stringify(payload),
     });
 
@@ -67,6 +91,8 @@ form.addEventListener('submit', async (event) => {
     document.getElementById('rocketUrl').value = data.urls.raw;
     clashUrl.value = data.urls.clash;
     surgeUrl.value = data.urls.surge;
+    existingUrl.value = data.urls.clash;
+    subscriptionName.value = data.subscriptionName;
 
     emptyState.classList.add('hidden');
 
@@ -99,7 +125,7 @@ form.addEventListener('submit', async (event) => {
     warningBox.classList.remove('hidden');
   } finally {
     submitBtn.disabled = false;
-    submitBtn.textContent = '生成订阅';
+    updateSubmitLabel();
   }
 });
 

@@ -1,28 +1,30 @@
 // Cloudflare Worker: KV short link subscription + access token protection
 // Requires:
 // - KV namespace binding: SUB_STORE
-// - Secret/Variable: SUB_ACCESS_TOKEN
-// Optional:
-// - Secret/Variable: SUB_LINK_SECRET (legacy long-token compatibility)
+// - SUB_ACCESS_TOKEN only for reading/migrating legacy subscriptions
+// New subscriptions use independent tokens; KV stores only their hashes.
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data, null, 2), {
     status,
     headers: {
       'content-type': 'application/json; charset=utf-8',
+      'cache-control': 'no-store',
       'access-control-allow-origin': '*',
       'access-control-allow-methods': 'GET,POST,OPTIONS',
-      'access-control-allow-headers': 'content-type',
+      'access-control-allow-headers': 'content-type,x-sub-access-token',
     },
   });
 }
 
-function text(body, status = 200, contentType = 'text/plain; charset=utf-8') {
+function text(body, status = 200, contentType = 'text/plain; charset=utf-8', headers = {}) {
   return new Response(body, {
     status,
     headers: {
       'content-type': contentType,
+      'cache-control': 'no-store',
       'access-control-allow-origin': '*',
+      ...headers,
     },
   });
 }
@@ -406,15 +408,6 @@ async function createUniqueShortId(env, tries = 8) {
   throw new Error('无法生成唯一短链接，请稍后再试');
 }
 
-function normalizeLines(value = '') {
-  return String(value)
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .sort()
-    .join('\n');
-}
-
 async function sha256Hex(input) {
   const data = new TextEncoder().encode(input);
   const digest = await crypto.subtle.digest('SHA-256', data);
@@ -423,14 +416,10 @@ async function sha256Hex(input) {
     .join('');
 }
 
-async function buildDedupHash(body) {
-  const normalized = {
-    nodeLinks: normalizeLines(body.nodeLinks || ''),
-    preferredIps: normalizeLines(body.preferredIps || ''),
-    namePrefix: String(body.namePrefix || '').trim(),
-    keepOriginalHost: body.keepOriginalHost !== false,
-  };
-  return sha256Hex(JSON.stringify(normalized));
+async function authorized(record, token, env, updating = false) {
+  if (record.accessTokenHash) return Boolean(token) && await sha256Hex(token) === record.accessTokenHash;
+  if (env.SUB_ACCESS_TOKEN) return token === env.SUB_ACCESS_TOKEN;
+  return !updating;
 }
 
 async function handleGenerate(request, env, url) {
@@ -441,7 +430,34 @@ async function handleGenerate(request, env, url) {
     return json({ ok: false, error: '请求体不是合法 JSON' }, 400);
   }
 
-  const baseNodes = parseRawLinks(body.nodeLinks || '');
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return json({ ok: false, error: '请求体必须是对象' }, 400);
+  }
+  const name = body.subscriptionName ?? 'subscription';
+  if (typeof name !== 'string' || /[\u0000-\u001f\u007f]/.test(name) || name.trim().length > 64 || !name.trim()) {
+    return json({ ok: false, error: '订阅名称须为 1–64 个字符，不能包含换行或控制字符' }, 400);
+  }
+  let id = body.updateId;
+  let previous = null;
+  let accessToken = request.headers.get('x-sub-access-token') || '';
+  if (id !== undefined) {
+    if (typeof id !== 'string' || !/^[A-Za-z0-9]{1,64}$/.test(id)) {
+      return json({ ok: false, error: '原订阅链接无效' }, 400);
+    }
+    const raw = await env.SUB_STORE.get(`sub:${id}`);
+    if (!raw) return json({ ok: false, error: '原订阅已过期或不存在，请清空原链接后新建' }, 404);
+    previous = JSON.parse(raw);
+    if (!await authorized(previous, accessToken, env, true)) {
+      return json({ ok: false, error: '无法验证原订阅，请使用完整订阅链接；无访问凭据的旧订阅需重新创建' }, 403);
+    }
+  }
+
+  let baseNodes;
+  try {
+    baseNodes = parseRawLinks(body.nodeLinks || '');
+  } catch {
+    return json({ ok: false, error: '节点链接格式无效' }, 400);
+  }
   const preferredEndpoints = parsePreferredEndpoints(body.preferredIps || '');
 
   if (!baseNodes.length) return json({ ok: false, error: '没有识别到可用节点' }, 400);
@@ -455,32 +471,23 @@ async function handleGenerate(request, env, url) {
   const nodes = buildNodes(baseNodes, preferredEndpoints, options);
 
   const payload = {
-    version: 1,
-    createdAt: new Date().toISOString(),
+    version: 2,
+    subscriptionName: name.trim(),
+    createdAt: previous?.createdAt || new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
     options,
     nodes,
   };
 
-  const dedupHash = await buildDedupHash(body);
-  const dedupKey = `dedup:${dedupHash}`;
-
-  let id = await env.SUB_STORE.get(dedupKey);
-
-  if (!id) {
-    id = await createUniqueShortId(env);
-    const ttl = 60 * 60 * 24 * 7; // 7天
-
-    await env.SUB_STORE.put(`sub:${id}`, JSON.stringify(payload), {
-      expirationTtl: ttl,
-    });
-
-    await env.SUB_STORE.put(dedupKey, id, {
-      expirationTtl: ttl,
-    });
+  const migrated = Boolean(previous && !previous.accessTokenHash);
+  if (!previous?.accessTokenHash) {
+    accessToken = Array.from(crypto.getRandomValues(new Uint8Array(32)), b => b.toString(16).padStart(2, '0')).join('');
   }
+  payload.accessTokenHash = previous?.accessTokenHash || await sha256Hex(accessToken);
+  if (!id) id = await createUniqueShortId(env);
+  await env.SUB_STORE.put(`sub:${id}`, JSON.stringify(payload));
 
   const origin = url.origin;
-  const accessToken = env.SUB_ACCESS_TOKEN || '';
   const withToken = (target) =>
     `${origin}/sub/${id}${
       target
@@ -491,7 +498,10 @@ async function handleGenerate(request, env, url) {
   return json({
     ok: true,
     storage: 'kv',
-    deduplicated: true,
+    deduplicated: false,
+    updated: Boolean(previous),
+    migrated,
+    subscriptionName: payload.subscriptionName,
     shortId: id,
     urls: {
       auto: withToken(''),
@@ -512,24 +522,11 @@ async function handleGenerate(request, env, url) {
       host: node.host || '',
       sni: node.sni || '',
     })),
-    warnings: accessToken ? [] : ['未检测到 SUB_ACCESS_TOKEN，订阅链接将没有第二层访问保护。'],
+    warnings: migrated ? ['旧订阅已升级，请在客户端将订阅地址替换为下方新链接一次。以后更新 IP 时链接不变。'] : [],
   });
 }
 
-function validateAccessToken(url, env) {
-  const expected = env.SUB_ACCESS_TOKEN;
-  if (!expected) return { ok: true };
-  const provided = url.searchParams.get('token') || '';
-  if (!provided || provided !== expected) {
-    return { ok: false, response: text('Forbidden: invalid token', 403) };
-  }
-  return { ok: true };
-}
-
 async function handleSub(url, env) {
-  const tokenCheck = validateAccessToken(url, env);
-  if (!tokenCheck.ok) return tokenCheck.response;
-
   const id = url.pathname.split('/').pop();
   if (!id) return text('missing id', 400);
 
@@ -537,20 +534,28 @@ async function handleSub(url, env) {
   if (!raw) return text('not found', 404);
 
   const record = JSON.parse(raw);
+  const token = url.searchParams.get('token') || '';
+  if (!await authorized(record, token, env)) return text('Forbidden: invalid token', 403);
   const nodes = record.nodes || [];
   const target = (url.searchParams.get('target') || 'raw').toLowerCase();
+  const extension = target === 'clash' ? '.yaml' : target === 'surge' ? '.conf' : '.txt';
+  const filename = (record.subscriptionName || 'subscription') + extension;
+  const ascii = filename.replace(/[^A-Za-z0-9._ -]/g, '_');
+  const encoded = encodeURIComponent(filename).replace(/[!'()*]/g, c => '%' + c.charCodeAt(0).toString(16).toUpperCase());
+  const headers = { 'content-disposition': `attachment; filename="${ascii}"; filename*=UTF-8''${encoded}` };
 
   if (target === 'clash') {
-    return text(renderClash(nodes), 200, 'text/yaml; charset=utf-8');
+    return text(renderClash(nodes), 200, 'text/yaml; charset=utf-8', headers);
   }
   if (target === 'surge') {
     return text(
-      renderSurge(nodes, url.origin + url.pathname, env.SUB_ACCESS_TOKEN || ''),
+      renderSurge(nodes, url.origin + url.pathname, token),
       200,
       'text/plain; charset=utf-8',
+      headers,
     );
   }
-  return text(renderRaw(nodes), 200, 'text/plain; charset=utf-8');
+  return text(renderRaw(nodes), 200, 'text/plain; charset=utf-8', headers);
 }
 
 export default {
@@ -562,7 +567,7 @@ export default {
         headers: {
           'access-control-allow-origin': '*',
           'access-control-allow-methods': 'GET,POST,OPTIONS',
-          'access-control-allow-headers': 'content-type',
+          'access-control-allow-headers': 'content-type,x-sub-access-token',
         },
       });
     }
