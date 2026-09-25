@@ -452,8 +452,8 @@ function renderClash(nodes) {
       `  - RULE-SET,cn_domain,DIRECT`,
       `  - RULE-SET,cn_ip,DIRECT,no-resolve`,
     ] : []),
-    // RN/DMIT exit through a SOCKS static IP that drops UDP: reject QUIC so YouTube etc. fall back to TCP at once.
-    ...(isRackNerd ? [`  - AND,((NETWORK,UDP),(DST-PORT,443)),REJECT`] : []),
+    // No UDP/443 reject (removed on user trial 2026-09-25; commit 413e6f1 added it): proxied QUIC dies at the
+    // UDP-less static exit and apps fall back to TCP on their own. Re-add after cn rules if fallback proves slow.
     `  - MATCH,${ruleTarget}`,
   ].join('\n');
 }

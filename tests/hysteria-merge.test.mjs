@@ -67,7 +67,8 @@ for (const [shortId, oldName, displayName] of [
   assert.ok(at('DOMAIN-SUFFIX,googleapis.cn,节点选择') >= 0 && at('DOMAIN-SUFFIX,googleapis.cn,节点选择') < at('RULE-SET,cn_domain,DIRECT'), `${shortId} Play CN endpoints proxied before cn set`);
   assert.ok(at('IP-CIDR,192.168.0.0/16,DIRECT,no-resolve') >= 0 && at('IP-CIDR,10.0.0.0/8,DIRECT,no-resolve') >= 0, `${shortId} LAN direct`);
   assert.ok(at('RULE-SET,cn_ip,DIRECT,no-resolve') > at('RULE-SET,cn_domain,DIRECT'), `${shortId} cn ip after cn domain`);
-  assert.ok(at('AND,((NETWORK,UDP),(DST-PORT,443)),REJECT') > at('RULE-SET,cn_ip,DIRECT,no-resolve'), `${shortId} domestic QUIC stays direct`);
+  // UDP/443 is NOT rejected (user trial 2026-09-25): QUIC to proxied targets fails and apps fall back to TCP themselves.
+  assert.ok(!rules.some(r => /NETWORK,UDP/.test(r) || /,REJECT$/.test(r)), `${shortId} no UDP/443 reject rule`);
   assert.equal(rules.at(-1), 'MATCH,节点选择');
   for (const [name, behavior] of [['cn_domain', 'domain'], ['cn_ip', 'ipcidr']]) {
     const p = rendered['rule-providers'][name];
