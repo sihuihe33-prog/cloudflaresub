@@ -333,22 +333,12 @@ function renderClash(nodes) {
     .map((node) => `      - "${escapeYaml(displayName(node))}"`);
 
   const allGroupMembers = [
-    ...(isRackNerd ? [] : [`      - "自动选择"`]),
+    `      - "自动选择"`,
     ...proxyNames,
     `      - DIRECT`,
   ];
 
   const autoGroupMembers = proxyNames.length ? proxyNames : [`      - DIRECT`];
-  const autoGroup = isRackNerd ? [] : [
-    `  - name: "自动选择"`,
-    `    type: url-test`,
-    `    url: "http://www.gstatic.com/generate_204"`,
-    `    interval: 300`,
-    `    tolerance: 50`,
-    `    proxies:`,
-    ...autoGroupMembers,
-    ``,
-  ];
 
   return [
     `mixed-port: 7890`,
@@ -361,7 +351,14 @@ function renderClash(nodes) {
     ...(proxies.length ? proxies : []),
     ``,
     `proxy-groups:`,
-    ...autoGroup,
+    `  - name: "自动选择"`,
+    `    type: url-test`,
+    `    url: "http://www.gstatic.com/generate_204"`,
+    `    interval: 300`,
+    `    tolerance: 50`,
+    `    proxies:`,
+    ...autoGroupMembers,
+    ``,
     ...(dmitProxyNames.length ? [
       `  - name: "DMIT"`,
       `    type: select`,

@@ -55,16 +55,17 @@ for (const [shortId, oldName, displayName] of [
 ]) {
   store.set(`sub:${shortId}`, JSON.stringify({ nodes: [{ ...oldNode, name: oldName }, node] }));
   const rendered = YAML.parse(await (await worker.fetch(new Request(`https://sub.example/sub/${shortId}?target=clash&token=test-secret`), env)).text());
-  assert.deepEqual(rendered['proxy-groups'].map(g => g.name), ['DMIT', 'RackNerd']);
+  assert.deepEqual(rendered['proxy-groups'].map(g => g.name), ['自动选择', 'DMIT', 'RackNerd']);
   assert.deepEqual(rendered.rules, ['MATCH,RackNerd']);
   assert.equal(rendered.proxies[0].name, displayName);
   assert.equal(rendered.proxies[1].name, node.name);
   assert.ok(rendered['proxy-groups'].find(g => g.name === 'RackNerd').proxies.includes(displayName));
+  assert.ok(rendered['proxy-groups'].find(g => g.name === '自动选择').proxies.includes(displayName));
   assert.ok(!rendered['proxy-groups'].find(g => g.name === 'RackNerd').proxies.includes(oldName));
   const byName = Object.fromEntries(rendered['proxy-groups'].map(g => [g.name, g.proxies]));
   assert.deepEqual(byName.DMIT, [node.name], `${shortId} DMIT group has only its own node`);
-  assert.equal(byName['自动选择'], undefined, `${shortId} auto group removed`);
-  assert.deepEqual(byName.RackNerd, [displayName, 'DIRECT'], `${shortId} RackNerd excludes DMIT and auto`);
+  assert.deepEqual(byName['自动选择'], [displayName], `${shortId} auto group excludes DMIT`);
+  assert.deepEqual(byName.RackNerd, ['自动选择', displayName, 'DIRECT'], `${shortId} RackNerd excludes DMIT`);
   assert.equal(JSON.parse(store.get(`sub:${shortId}`)).nodes[0].name, oldName, 'do not mutate KV names');
 }
 console.log('hysteria merge test passed');
