@@ -58,6 +58,15 @@ for (const [shortId, oldName, displayName] of [
   assert.deepEqual(rendered['proxy-groups'].map(g => g.name), ['节点选择', '自动选择', 'DMIT', 'RackNerd']);
   // All RN/DMIT nodes exit via a SOCKS static IP that drops UDP; reject QUIC so apps (YouTube) fall back to TCP.
   assert.deepEqual(rendered.rules, ['AND,((NETWORK,UDP),(DST-PORT,443)),REJECT', 'MATCH,节点选择']);
+  // Static exit has no IPv6: phones in VPN mode must never get AAAA, and IP-literal flows get their SNI sniffed.
+  assert.equal(rendered.ipv6, false, `${shortId} ipv6 off`);
+  assert.equal(rendered.dns.enable, true);
+  assert.equal(rendered.dns.ipv6, false, `${shortId} dns returns no AAAA`);
+  assert.equal(rendered.dns['enhanced-mode'], 'fake-ip');
+  assert.equal(rendered.sniffer.enable, true);
+  assert.equal(rendered.sniffer['parse-pure-ip'], true);
+  assert.equal(rendered.sniffer['override-destination'], true);
+  assert.deepEqual(rendered.sniffer.sniff.TLS.ports, [443, 8443]);
   assert.deepEqual(rendered['proxy-groups'][0], { name: '节点选择', type: 'select', proxies: ['RackNerd', 'DMIT'] }, `${shortId} top selector`);
   assert.equal(rendered['proxy-groups'].find(g => g.name === '自动选择').hidden, true, `${shortId} auto group hidden in UI`);
   assert.equal(rendered['proxy-groups'].find(g => g.name === '自动选择').type, 'url-test', `${shortId} auto group still url-test`);
