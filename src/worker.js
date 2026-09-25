@@ -218,6 +218,12 @@ function renderRaw(nodes) {
 function renderClash(nodes) {
   const proxies = nodes
     .map((node) => {
+      if (node.type === 'hysteria2') {
+        const fields = ['name', 'type', 'server', 'port', 'password', 'sni', 'alpn', 'obfs', 'obfs-password', 'udp', 'skip-cert-verify', 'up', 'down', 'ports'];
+        return fields.filter((key) => node[key] !== undefined)
+          .map((key, index) => `${index === 0 ? '  - ' : '    '}${key}: ${key === 'type' ? 'hysteria2' : JSON.stringify(node[key])}`)
+          .join('\n');
+      }
       if (node.type === 'vmess') {
         const lines = [
           `  - name: "${escapeYaml(node.name)}"`,
@@ -441,6 +447,42 @@ async function handleGenerate(request, env, url) {
     return json({ ok: false, error: '请求体不是合法 JSON' }, 400);
   }
 
+  const updateId = String(body.updateId || '').trim();
+  if (updateId && !/^[a-zA-Z0-9]{1,64}$/.test(updateId)) {
+    return json({ ok: false, error: 'Invalid updateId' }, 400);
+  }
+
+  // Preserve all existing nodes and the short URL. A standalone Hysteria2
+  // node must NOT be fed into buildNodes(), which replaces servers with CF IPs.
+  if (updateId && body.appendClashProxy !== undefined) {
+    const expected = env.SUB_ACCESS_TOKEN;
+    if (!expected || request.headers.get('x-sub-access-token') !== expected) {
+      return json({ ok: false, error: 'Forbidden' }, 403);
+    }
+    const raw = await env.SUB_STORE.get(`sub:${updateId}`);
+    if (!raw) return json({ ok: false, error: 'updateId not found' }, 404);
+    const node = body.appendClashProxy;
+    const valid = node && typeof node === 'object' && !Array.isArray(node)
+      && node.type === 'hysteria2'
+      && typeof node.name === 'string' && node.name.length > 0 && node.name.length <= 100
+      && typeof node.server === 'string' && /^[a-zA-Z0-9.-]{1,253}$/.test(node.server)
+      && Number.isInteger(node.port) && node.port >= 1 && node.port <= 65535
+      && typeof node.password === 'string' && node.password.length > 0
+      && Object.keys(node).every((key) => ['name', 'type', 'server', 'port', 'password', 'sni', 'alpn', 'obfs', 'obfs-password', 'udp', 'skip-cert-verify', 'up', 'down', 'ports'].includes(key));
+    if (!valid) return json({ ok: false, error: 'Invalid hysteria2 proxy' }, 400);
+    const record = JSON.parse(raw);
+    const nodes = record.nodes || [];
+    if (nodes.some((existing) => existing.name === node.name && (existing.type !== node.type || existing.server !== node.server || existing.port !== node.port || existing.password !== node.password))) {
+      return json({ ok: false, error: 'Proxy name already in use' }, 409);
+    }
+    const alreadyPresent = nodes.some((existing) => existing.type === node.type && existing.server === node.server && existing.port === node.port && existing.password === node.password);
+    if (!alreadyPresent) {
+      nodes.push(node);
+      await env.SUB_STORE.put(`sub:${updateId}`, JSON.stringify({ ...record, nodes }));
+    }
+    return json({ ok: true, updated: !alreadyPresent, shortId: updateId, appendedCount: alreadyPresent ? 0 : 1, counts: { outputNodes: nodes.length } });
+  }
+
   const baseNodes = parseRawLinks(body.nodeLinks || '');
   const preferredEndpoints = parsePreferredEndpoints(body.preferredIps || '');
 
@@ -466,12 +508,15 @@ async function handleGenerate(request, env, url) {
 
   // In-place update: when the request carries updateId and that id exists,
   // rewrite the KV record under the SAME id so the subscription link never changes.
-  const updateId = String(body.updateId || '').trim();
   if (updateId) {
     const existing = await env.SUB_STORE.get(`sub:${updateId}`);
     if (!existing) {
       return json({ ok: false, error: `updateId 不存在：${updateId}` }, 404);
     }
+    // CFST refreshes the preferred-IP nodes through this legacy endpoint.
+    // Keep standalone HY2 nodes that were appended to the fixed URL.
+    const standalone = (JSON.parse(existing).nodes || []).filter((node) => node.type === 'hysteria2');
+    payload.nodes = [...nodes, ...standalone.filter((node) => !nodes.some((base) => base.name === node.name))];
     const ttl = 60 * 60 * 24 * 7; // 7天，与原逻辑一致
     await env.SUB_STORE.put(`sub:${updateId}`, JSON.stringify(payload), {
       expirationTtl: ttl,
@@ -503,9 +548,9 @@ async function handleGenerate(request, env, url) {
       counts: {
         inputNodes: baseNodes.length,
         preferredEndpoints: preferredEndpoints.length,
-        outputNodes: nodes.length,
+        outputNodes: payload.nodes.length,
       },
-      preview: nodes.slice(0, 20).map((node) => ({
+      preview: payload.nodes.slice(0, 20).map((node) => ({
         name: node.name,
         type: node.type,
         server: node.server,
