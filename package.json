@@ -9,6 +9,7 @@
     "check": "node tests/smoke.mjs"
   },
   "devDependencies": {
-    "wrangler": "^4.0.0"
+    "wrangler": "^4.0.0",
+    "yaml": "^2.8.2"
   }
 }

@@ -323,10 +323,14 @@ function renderClash(nodes) {
   const proxyNames = nodes.map(
     (node) => `      - "${escapeYaml(node.name)}"`
   );
+  const dmitProxyNames = nodes
+    .filter((node) => node.type === 'hysteria2' && node.server === 'dmit.gghui.top')
+    .map((node) => `      - "${escapeYaml(node.name)}"`);
 
   const allGroupMembers = [
     `      - "自动选择"`,
     ...proxyNames,
+    ...(dmitProxyNames.length ? [`      - "DMIT"`] : []),
     `      - DIRECT`,
   ];
 
@@ -351,6 +355,13 @@ function renderClash(nodes) {
     `    proxies:`,
     ...autoGroupMembers,
     ``,
+    ...(dmitProxyNames.length ? [
+      `  - name: "DMIT"`,
+      `    type: select`,
+      `    proxies:`,
+      ...dmitProxyNames,
+      ``,
+    ] : []),
     `  - name: "节点选择"`,
     `    type: select`,
     `    proxies:`,

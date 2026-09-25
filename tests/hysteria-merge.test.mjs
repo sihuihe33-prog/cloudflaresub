@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import YAML from 'yaml';
 import worker from '../src/worker.js';
 
 const id = 'Existing443';
@@ -34,6 +35,10 @@ assert.match(yaml, /password: "test-hy2-password"/);
 assert.match(yaml, /skip-cert-verify: false/);
 assert.match(yaml, /type: vless/);
 assert.match(yaml, /"DMIT HY2"/);
+const groups = YAML.parse(yaml)['proxy-groups'];
+assert.deepEqual(groups.find(g => g.name === 'DMIT'), { name: 'DMIT', type: 'select', proxies: [node.name] });
+assert.ok(groups.find(g => g.name === '节点选择').proxies.includes('DMIT'));
+assert.ok(groups.find(g => g.name === '自动选择').proxies.includes('Old node'));
 const raw = await worker.fetch(new Request(`https://sub.example/sub/${id}?target=raw&token=test-secret`), env);
 assert.equal(raw.status, 200);
 assert.ok((await raw.text()).length > 0, 'existing raw format stays accessible');
