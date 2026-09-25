@@ -206,6 +206,7 @@ function encodeTrojan(node) {
 function renderRaw(nodes) {
   const lines = nodes
     .map((node) => {
+      if (node.standalone === true) return '';
       if (node.type === 'vmess') return encodeVmess(node);
       if (node.type === 'vless') return encodeVless(node);
       if (node.type === 'trojan') return encodeTrojan(node);
@@ -216,12 +217,19 @@ function renderRaw(nodes) {
 }
 
 function renderClash(nodes) {
+  // Flow-style YAML (valid YAML, since JSON is a YAML subset) for a verbatim
+  // standalone Clash proxy such as VLESS+Reality.
+  const YAML_LINE = (obj) => `  - ${JSON.stringify(obj)}`;
   const isRackNerd = nodes.some((node) => String(node.name || '').startsWith('RackNerd|'));
   const mainGroupName = isRackNerd ? 'RackNerd' : '节点选择';
   const displayName = (node) => isRackNerd && String(node.name || '').startsWith('RackNerd|')
     ? node.name.slice('RackNerd|'.length) : node.name;
   const proxies = nodes
     .map((node) => {
+      if (node.standalone === true && node.type === 'vless') {
+        const { standalone, ...clean } = node;
+        return YAML_LINE(clean);
+      }
       if (node.type === 'hysteria2') {
         const fields = ['name', 'type', 'server', 'port', 'password', 'sni', 'alpn', 'obfs', 'obfs-password', 'udp', 'skip-cert-verify', 'up', 'down', 'ports'];
         return fields.filter((key) => node[key] !== undefined)
@@ -324,7 +332,7 @@ function renderClash(nodes) {
     })
     .filter(Boolean);
 
-  const isDmit = (node) => node.type === 'hysteria2' && node.server === 'dmit.gghui.top';
+  const isDmit = (node) => (node.type === 'hysteria2' || node.standalone === true) && node.server === 'dmit.gghui.top';
   const proxyNames = nodes.filter((node) => !isDmit(node)).map(
     (node) => `      - "${escapeYaml(displayName(node))}"`
   );
@@ -477,22 +485,34 @@ async function handleGenerate(request, env, url) {
     const raw = await env.SUB_STORE.get(`sub:${updateId}`);
     if (!raw) return json({ ok: false, error: 'updateId not found' }, 404);
     const node = body.appendClashProxy;
-    const valid = node && typeof node === 'object' && !Array.isArray(node)
-      && node.type === 'hysteria2'
+    const HY2_KEYS = ['name', 'type', 'server', 'port', 'password', 'sni', 'alpn', 'obfs', 'obfs-password', 'udp', 'skip-cert-verify', 'up', 'down', 'ports'];
+    const REALITY_KEYS = ['name', 'type', 'server', 'port', 'uuid', 'network', 'tls', 'udp', 'flow', 'servername', 'client-fingerprint', 'reality-opts'];
+    const base = node && typeof node === 'object' && !Array.isArray(node)
       && typeof node.name === 'string' && node.name.length > 0 && node.name.length <= 100
       && typeof node.server === 'string' && /^[a-zA-Z0-9.-]{1,253}$/.test(node.server)
-      && Number.isInteger(node.port) && node.port >= 1 && node.port <= 65535
+      && Number.isInteger(node.port) && node.port >= 1 && node.port <= 65535;
+    const isHy2 = base && node.type === 'hysteria2'
       && typeof node.password === 'string' && node.password.length > 0
-      && Object.keys(node).every((key) => ['name', 'type', 'server', 'port', 'password', 'sni', 'alpn', 'obfs', 'obfs-password', 'udp', 'skip-cert-verify', 'up', 'down', 'ports'].includes(key));
-    if (!valid) return json({ ok: false, error: 'Invalid hysteria2 proxy' }, 400);
+      && Object.keys(node).every((key) => HY2_KEYS.includes(key));
+    const ro = node && node['reality-opts'];
+    const isReality = base && node.type === 'vless' && node.tls === true && node.network === 'tcp'
+      && typeof node.uuid === 'string' && /^[0-9a-fA-F-]{36}$/.test(node.uuid)
+      && typeof node.servername === 'string' && /^[a-zA-Z0-9.-]{1,253}$/.test(node.servername)
+      && ro && typeof ro === 'object' && typeof ro['public-key'] === 'string' && /^[A-Za-z0-9_-]{43}$/.test(ro['public-key'])
+      && typeof ro['short-id'] === 'string' && /^[0-9a-fA-F]{0,16}$/.test(ro['short-id'])
+      && Object.keys(ro).every((key) => ['public-key', 'short-id', 'support-x25519mlkem768'].includes(key))
+      && Object.keys(node).every((key) => REALITY_KEYS.includes(key));
+    if (!isHy2 && !isReality) return json({ ok: false, error: 'Invalid standalone proxy' }, 400);
     const record = JSON.parse(raw);
     const nodes = record.nodes || [];
-    if (nodes.some((existing) => existing.name === node.name && (existing.type !== node.type || existing.server !== node.server || existing.port !== node.port || existing.password !== node.password))) {
+    const same = (a) => a.type === node.type && a.server === node.server && a.port === node.port
+      && (node.type === 'hysteria2' ? a.password === node.password : a.uuid === node.uuid);
+    if (nodes.some((existing) => existing.name === node.name && !same(existing))) {
       return json({ ok: false, error: 'Proxy name already in use' }, 409);
     }
-    const alreadyPresent = nodes.some((existing) => existing.type === node.type && existing.server === node.server && existing.port === node.port && existing.password === node.password);
+    const alreadyPresent = nodes.some(same);
     if (!alreadyPresent) {
-      nodes.push(node);
+      nodes.push(isReality ? { ...node, standalone: true } : node);
       await env.SUB_STORE.put(`sub:${updateId}`, JSON.stringify({ ...record, nodes }));
     }
     return json({ ok: true, updated: !alreadyPresent, shortId: updateId, appendedCount: alreadyPresent ? 0 : 1, counts: { outputNodes: nodes.length } });
@@ -530,7 +550,7 @@ async function handleGenerate(request, env, url) {
     }
     // CFST refreshes the preferred-IP nodes through this legacy endpoint.
     // Keep standalone HY2 nodes that were appended to the fixed URL.
-    const standalone = (JSON.parse(existing).nodes || []).filter((node) => node.type === 'hysteria2');
+    const standalone = (JSON.parse(existing).nodes || []).filter((node) => node.type === 'hysteria2' || node.standalone === true);
     payload.nodes = [...nodes, ...standalone.filter((node) => !nodes.some((base) => base.name === node.name))];
     const ttl = 60 * 60 * 24 * 7; // 7天，与原逻辑一致
     await env.SUB_STORE.put(`sub:${updateId}`, JSON.stringify(payload), {
