@@ -47,4 +47,19 @@ const refresh = await post({ updateId: id, nodeLinks: `vless://${oldNode.uuid}@e
 assert.equal(refresh.status, 200);
 assert.equal((await refresh.json()).counts.outputNodes, 2);
 assert.equal(JSON.parse(store.get(`sub:${id}`)).nodes.filter(n => n.type === 'hysteria2').length, 1);
+for (const [shortId, oldName, displayName] of [
+  ['RN443', 'RackNerd|每日优选CF | 香港 | 1', '每日优选CF | 香港 | 1'],
+  ['RN80', 'RackNerd|备用CF | 西雅图 | 1', '备用CF | 西雅图 | 1'],
+]) {
+  store.set(`sub:${shortId}`, JSON.stringify({ nodes: [{ ...oldNode, name: oldName }, node] }));
+  const rendered = YAML.parse(await (await worker.fetch(new Request(`https://sub.example/sub/${shortId}?target=clash&token=test-secret`), env)).text());
+  assert.deepEqual(rendered['proxy-groups'].map(g => g.name), ['自动选择', 'DMIT', 'RackNerd']);
+  assert.deepEqual(rendered.rules, ['MATCH,RackNerd']);
+  assert.equal(rendered.proxies[0].name, displayName);
+  assert.equal(rendered.proxies[1].name, node.name);
+  assert.ok(rendered['proxy-groups'].find(g => g.name === 'RackNerd').proxies.includes(displayName));
+  assert.ok(rendered['proxy-groups'].find(g => g.name === '自动选择').proxies.includes(displayName));
+  assert.ok(!rendered['proxy-groups'].find(g => g.name === 'RackNerd').proxies.includes(oldName));
+  assert.equal(JSON.parse(store.get(`sub:${shortId}`)).nodes[0].name, oldName, 'do not mutate KV names');
+}
 console.log('hysteria merge test passed');

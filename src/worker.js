@@ -216,17 +216,21 @@ function renderRaw(nodes) {
 }
 
 function renderClash(nodes) {
+  const isRackNerd = nodes.some((node) => String(node.name || '').startsWith('RackNerd|'));
+  const mainGroupName = isRackNerd ? 'RackNerd' : '节点选择';
+  const displayName = (node) => isRackNerd && String(node.name || '').startsWith('RackNerd|')
+    ? node.name.slice('RackNerd|'.length) : node.name;
   const proxies = nodes
     .map((node) => {
       if (node.type === 'hysteria2') {
         const fields = ['name', 'type', 'server', 'port', 'password', 'sni', 'alpn', 'obfs', 'obfs-password', 'udp', 'skip-cert-verify', 'up', 'down', 'ports'];
         return fields.filter((key) => node[key] !== undefined)
-          .map((key, index) => `${index === 0 ? '  - ' : '    '}${key}: ${key === 'type' ? 'hysteria2' : JSON.stringify(node[key])}`)
+          .map((key, index) => `${index === 0 ? '  - ' : '    '}${key}: ${key === 'type' ? 'hysteria2' : JSON.stringify(key === 'name' ? displayName(node) : node[key])}`)
           .join('\n');
       }
       if (node.type === 'vmess') {
         const lines = [
-          `  - name: "${escapeYaml(node.name)}"`,
+          `  - name: "${escapeYaml(displayName(node))}"`,
           `    type: vmess`,
           `    server: ${node.server}`,
           `    port: ${node.port}`,
@@ -256,7 +260,7 @@ function renderClash(nodes) {
 
       if (node.type === 'vless') {
         const lines = [
-          `  - name: "${escapeYaml(node.name)}"`,
+          `  - name: "${escapeYaml(displayName(node))}"`,
           `    type: vless`,
           `    server: ${node.server}`,
           `    port: ${node.port}`,
@@ -284,7 +288,7 @@ function renderClash(nodes) {
 
       if (node.type === 'trojan') {
         const lines = [
-          `  - name: "${escapeYaml(node.name)}"`,
+          `  - name: "${escapeYaml(displayName(node))}"`,
           `    type: trojan`,
           `    server: ${node.server}`,
           `    port: ${node.port}`,
@@ -321,11 +325,11 @@ function renderClash(nodes) {
     .filter(Boolean);
 
   const proxyNames = nodes.map(
-    (node) => `      - "${escapeYaml(node.name)}"`
+    (node) => `      - "${escapeYaml(displayName(node))}"`
   );
   const dmitProxyNames = nodes
     .filter((node) => node.type === 'hysteria2' && node.server === 'dmit.gghui.top')
-    .map((node) => `      - "${escapeYaml(node.name)}"`);
+    .map((node) => `      - "${escapeYaml(displayName(node))}"`);
 
   const allGroupMembers = [
     `      - "自动选择"`,
@@ -362,13 +366,13 @@ function renderClash(nodes) {
       ...dmitProxyNames,
       ``,
     ] : []),
-    `  - name: "节点选择"`,
+    `  - name: "${escapeYaml(mainGroupName)}"`,
     `    type: select`,
     `    proxies:`,
     ...allGroupMembers,
     ``,
     `rules:`,
-    `  - MATCH,节点选择`,
+    `  - MATCH,${mainGroupName}`,
   ].join('\n');
 }
 
