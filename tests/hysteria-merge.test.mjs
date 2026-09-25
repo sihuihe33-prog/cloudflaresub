@@ -66,6 +66,11 @@ for (const [shortId, oldName, displayName] of [
   assert.ok(!rules.some(r => /^(GEOSITE|GEOIP),/.test(r)), `${shortId} no geo-file dependent rules`);
   assert.ok(at('DOMAIN-SUFFIX,googleapis.cn,节点选择') >= 0 && at('DOMAIN-SUFFIX,googleapis.cn,节点选择') < at('RULE-SET,cn_domain,DIRECT'), `${shortId} Play CN endpoints proxied before cn set`);
   assert.ok(at('IP-CIDR,192.168.0.0/16,DIRECT,no-resolve') >= 0 && at('IP-CIDR,10.0.0.0/8,DIRECT,no-resolve') >= 0, `${shortId} LAN direct`);
+  // Douyin/ByteDance suffixes missing from geosite cn (same gaps the PC Script.js covers) must be direct explicitly.
+  for (const d of ['snssdk.com', 'ibytedtos.com', 'bcast.net', 'douyincloud.com']) {
+    const i = at(`DOMAIN-SUFFIX,${d},DIRECT`);
+    assert.ok(i >= 0 && i < at('MATCH,节点选择'), `${shortId} Douyin ${d} direct`);
+  }
   assert.ok(at('RULE-SET,cn_ip,DIRECT,no-resolve') > at('RULE-SET,cn_domain,DIRECT'), `${shortId} cn ip after cn domain`);
   // UDP/443 is NOT rejected (user trial 2026-09-25): QUIC to proxied targets fails and apps fall back to TCP themselves.
   assert.ok(!rules.some(r => /NETWORK,UDP/.test(r) || /,REJECT$/.test(r)), `${shortId} no UDP/443 reject rule`);

@@ -449,6 +449,8 @@ function renderClash(nodes) {
       `  - DOMAIN-SUFFIX,local,DIRECT`,
       ...['10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16', '127.0.0.0/8', '100.64.0.0/10', '169.254.0.0/16']
         .map(cidr => `  - IP-CIDR,${cidr},DIRECT,no-resolve`),
+      // Douyin/ByteDance CDN & API suffixes missing from geosite cn (same gaps the PC Script.js covers).
+      ...['snssdk.com', 'ibytedtos.com', 'bcast.net', 'douyincloud.com'].map(d => `  - DOMAIN-SUFFIX,${d},DIRECT`),
       `  - RULE-SET,cn_domain,DIRECT`,
       `  - RULE-SET,cn_ip,DIRECT,no-resolve`,
     ] : []),
