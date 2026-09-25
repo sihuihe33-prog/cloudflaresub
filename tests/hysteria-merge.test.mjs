@@ -58,6 +58,8 @@ for (const [shortId, oldName, displayName] of [
   assert.deepEqual(rendered['proxy-groups'].map(g => g.name), ['节点选择', '自动选择', 'DMIT', 'RackNerd']);
   assert.deepEqual(rendered.rules, ['MATCH,节点选择']);
   assert.deepEqual(rendered['proxy-groups'][0], { name: '节点选择', type: 'select', proxies: ['RackNerd', 'DMIT'] }, `${shortId} top selector`);
+  assert.equal(rendered['proxy-groups'].find(g => g.name === '自动选择').hidden, true, `${shortId} auto group hidden in UI`);
+  assert.equal(rendered['proxy-groups'].find(g => g.name === '自动选择').type, 'url-test', `${shortId} auto group still url-test`);
   assert.equal(rendered.proxies[0].name, displayName);
   assert.equal(rendered.proxies[1].name, node.name);
   assert.ok(rendered['proxy-groups'].find(g => g.name === 'RackNerd').proxies.includes(displayName));

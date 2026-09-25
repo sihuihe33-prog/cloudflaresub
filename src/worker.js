@@ -372,6 +372,7 @@ function renderClash(nodes) {
     ] : []),
     `  - name: "自动选择"`,
     `    type: url-test`,
+    ...(hasTopSelector ? [`    hidden: true`] : []),
     `    url: "http://www.gstatic.com/generate_204"`,
     `    interval: 300`,
     `    tolerance: 50`,
