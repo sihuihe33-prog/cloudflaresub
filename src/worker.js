@@ -138,7 +138,8 @@ function buildNodes(baseNodes, preferredEndpoints, options = {}) {
     for (const ep of preferredEndpoints) {
       counter += 1;
       const nameParts = [];
-      if (node.name) nameParts.push(node.name);
+      // usePrefixOnly: the daily RN updater wants `<prefix> | <remark>` without the base node's own name.
+      if (node.name && !(options.usePrefixOnly && prefix)) nameParts.push(node.name);
       if (prefix) nameParts.push(prefix);
       if (ep.remark) nameParts.push(ep.remark);
       else nameParts.push(String(counter));
@@ -538,6 +539,8 @@ async function handleGenerate(request, env, url) {
 
   const options = {
     namePrefix: body.namePrefix || '',
+    usePrefixOnly: body.usePrefixOnly === true,
+    compactName: body.compactName === true,
     keepOriginalHost: body.keepOriginalHost !== false,
   };
 
