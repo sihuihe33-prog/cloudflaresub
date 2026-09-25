@@ -393,6 +393,8 @@ function renderClash(nodes) {
     ...allGroupMembers,
     ``,
     `rules:`,
+    // RN/DMIT exit through a SOCKS static IP that drops UDP: reject QUIC so YouTube etc. fall back to TCP at once.
+    ...(isRackNerd ? [`  - AND,((NETWORK,UDP),(DST-PORT,443)),REJECT`] : []),
     `  - MATCH,${ruleTarget}`,
   ].join('\n');
 }

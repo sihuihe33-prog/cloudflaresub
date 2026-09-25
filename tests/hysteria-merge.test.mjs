@@ -56,7 +56,8 @@ for (const [shortId, oldName, displayName] of [
   store.set(`sub:${shortId}`, JSON.stringify({ nodes: [{ ...oldNode, name: oldName }, node] }));
   const rendered = YAML.parse(await (await worker.fetch(new Request(`https://sub.example/sub/${shortId}?target=clash&token=test-secret`), env)).text());
   assert.deepEqual(rendered['proxy-groups'].map(g => g.name), ['节点选择', '自动选择', 'DMIT', 'RackNerd']);
-  assert.deepEqual(rendered.rules, ['MATCH,节点选择']);
+  // All RN/DMIT nodes exit via a SOCKS static IP that drops UDP; reject QUIC so apps (YouTube) fall back to TCP.
+  assert.deepEqual(rendered.rules, ['AND,((NETWORK,UDP),(DST-PORT,443)),REJECT', 'MATCH,节点选择']);
   assert.deepEqual(rendered['proxy-groups'][0], { name: '节点选择', type: 'select', proxies: ['RackNerd', 'DMIT'] }, `${shortId} top selector`);
   assert.equal(rendered['proxy-groups'].find(g => g.name === '自动选择').hidden, true, `${shortId} auto group hidden in UI`);
   assert.equal(rendered['proxy-groups'].find(g => g.name === '自动选择').type, 'url-test', `${shortId} auto group still url-test`);
