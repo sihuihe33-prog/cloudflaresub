@@ -57,7 +57,26 @@ for (const [shortId, oldName, displayName] of [
   const rendered = YAML.parse(await (await worker.fetch(new Request(`https://sub.example/sub/${shortId}?target=clash&token=test-secret`), env)).text());
   assert.deepEqual(rendered['proxy-groups'].map(g => g.name), ['节点选择', '自动选择', 'DMIT', 'RackNerd']);
   // All RN/DMIT nodes exit via a SOCKS static IP that drops UDP; reject QUIC so apps (YouTube) fall back to TCP.
-  assert.deepEqual(rendered.rules, ['AND,((NETWORK,UDP),(DST-PORT,443)),REJECT', 'MATCH,节点选择']);
+  // Phones get no local Script.js: LAN + China direct must live in the subscription itself.
+  // googleapis.cn / xn--ngstr-lra8j.com are Play Store/Google China endpoints that are blocked when direct.
+  // China lists come from rule-providers fetched through the proxy: a failed fetch leaves the set empty
+  // (traffic falls through to the proxy) instead of failing the whole config like GEOSITE/GEOIP would.
+  const rules = rendered.rules;
+  const at = r => rules.indexOf(r);
+  assert.ok(!rules.some(r => /^(GEOSITE|GEOIP),/.test(r)), `${shortId} no geo-file dependent rules`);
+  assert.ok(at('DOMAIN-SUFFIX,googleapis.cn,节点选择') >= 0 && at('DOMAIN-SUFFIX,googleapis.cn,节点选择') < at('RULE-SET,cn_domain,DIRECT'), `${shortId} Play CN endpoints proxied before cn set`);
+  assert.ok(at('IP-CIDR,192.168.0.0/16,DIRECT,no-resolve') >= 0 && at('IP-CIDR,10.0.0.0/8,DIRECT,no-resolve') >= 0, `${shortId} LAN direct`);
+  assert.ok(at('RULE-SET,cn_ip,DIRECT,no-resolve') > at('RULE-SET,cn_domain,DIRECT'), `${shortId} cn ip after cn domain`);
+  assert.ok(at('AND,((NETWORK,UDP),(DST-PORT,443)),REJECT') > at('RULE-SET,cn_ip,DIRECT,no-resolve'), `${shortId} domestic QUIC stays direct`);
+  assert.equal(rules.at(-1), 'MATCH,节点选择');
+  for (const [name, behavior] of [['cn_domain', 'domain'], ['cn_ip', 'ipcidr']]) {
+    const p = rendered['rule-providers'][name];
+    assert.equal(p.behavior, behavior);
+    assert.equal(p.format, 'mrs');
+    assert.equal(p.proxy, '节点选择', `${shortId} ${name} downloads through the proxy (GitHub/jsdelivr unreliable from CN)`);
+  }
+  assert.equal(rendered['geox-url'], undefined, `${shortId} no geo file download needed`);
+  assert.ok(rendered.dns['fake-ip-filter'].includes('+.lan'), `${shortId} fake-ip-filter`);
   // Static exit has no IPv6: phones in VPN mode must never get AAAA, and IP-literal flows get their SNI sniffed.
   assert.equal(rendered.ipv6, false, `${shortId} ipv6 off`);
   assert.equal(rendered.dns.enable, true);

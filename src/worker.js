@@ -366,6 +366,13 @@ function renderClash(nodes) {
       `  ipv6: false`,
       `  enhanced-mode: fake-ip`,
       `  fake-ip-range: 198.18.0.1/16`,
+      `  fake-ip-filter:`,
+      `    - "+.lan"`,
+      `    - "+.local"`,
+      `    - "+.msftconnecttest.com"`,
+      `    - "+.msftncsi.com"`,
+      `    - "time.*.com"`,
+      `    - "ntp.*.com"`,
       `  nameserver:`,
       `    - https://223.5.5.5/dns-query`,
       `    - https://1.12.12.12/dns-query`,
@@ -416,7 +423,35 @@ function renderClash(nodes) {
     `    proxies:`,
     ...allGroupMembers,
     ``,
+    // China lists as rule-providers fetched through the proxy: a failed fetch only leaves the set empty
+    // (traffic falls through to the proxy), unlike GEOSITE/GEOIP which fail the whole config without geo files.
+    ...(isRackNerd ? [
+      `rule-providers:`,
+      ...[['cn_domain', 'domain', 'geosite/cn'], ['cn_ip', 'ipcidr', 'geoip/cn']].flatMap(([name, behavior, file]) => [
+        `  ${name}:`,
+        `    type: http`,
+        `    behavior: ${behavior}`,
+        `    format: mrs`,
+        `    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/${file}.mrs"`,
+        `    path: ./ruleset/${name}.mrs`,
+        `    interval: 86400`,
+        `    proxy: "${escapeYaml(ruleTarget)}"`,
+      ]),
+      ``,
+    ] : []),
     `rules:`,
+    // Phones have no local Script.js like the PC, so LAN + China direct must come from the subscription.
+    // Play Store's China endpoints are blocked when direct: send them through the proxy before the cn set.
+    ...(isRackNerd ? [
+      `  - DOMAIN-SUFFIX,googleapis.cn,${ruleTarget}`,
+      `  - DOMAIN-SUFFIX,xn--ngstr-lra8j.com,${ruleTarget}`,
+      `  - DOMAIN-SUFFIX,lan,DIRECT`,
+      `  - DOMAIN-SUFFIX,local,DIRECT`,
+      ...['10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16', '127.0.0.0/8', '100.64.0.0/10', '169.254.0.0/16']
+        .map(cidr => `  - IP-CIDR,${cidr},DIRECT,no-resolve`),
+      `  - RULE-SET,cn_domain,DIRECT`,
+      `  - RULE-SET,cn_ip,DIRECT,no-resolve`,
+    ] : []),
     // RN/DMIT exit through a SOCKS static IP that drops UDP: reject QUIC so YouTube etc. fall back to TCP at once.
     ...(isRackNerd ? [`  - AND,((NETWORK,UDP),(DST-PORT,443)),REJECT`] : []),
     `  - MATCH,${ruleTarget}`,
