@@ -55,8 +55,9 @@ for (const [shortId, oldName, displayName] of [
 ]) {
   store.set(`sub:${shortId}`, JSON.stringify({ nodes: [{ ...oldNode, name: oldName }, node] }));
   const rendered = YAML.parse(await (await worker.fetch(new Request(`https://sub.example/sub/${shortId}?target=clash&token=test-secret`), env)).text());
-  assert.deepEqual(rendered['proxy-groups'].map(g => g.name), ['自动选择', 'DMIT', 'RackNerd']);
-  assert.deepEqual(rendered.rules, ['MATCH,RackNerd']);
+  assert.deepEqual(rendered['proxy-groups'].map(g => g.name), ['节点选择', '自动选择', 'DMIT', 'RackNerd']);
+  assert.deepEqual(rendered.rules, ['MATCH,节点选择']);
+  assert.deepEqual(rendered['proxy-groups'][0], { name: '节点选择', type: 'select', proxies: ['RackNerd', 'DMIT'] }, `${shortId} top selector`);
   assert.equal(rendered.proxies[0].name, displayName);
   assert.equal(rendered.proxies[1].name, node.name);
   assert.ok(rendered['proxy-groups'].find(g => g.name === 'RackNerd').proxies.includes(displayName));

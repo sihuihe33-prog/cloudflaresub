@@ -347,6 +347,9 @@ function renderClash(nodes) {
   ];
 
   const autoGroupMembers = proxyNames.length ? proxyNames : [`      - DIRECT`];
+  // RN subscriptions that also carry DMIT get a top-level switch so rule mode can pick either line.
+  const hasTopSelector = isRackNerd && dmitProxyNames.length > 0;
+  const ruleTarget = hasTopSelector ? '节点选择' : mainGroupName;
 
   return [
     `mixed-port: 7890`,
@@ -359,6 +362,14 @@ function renderClash(nodes) {
     ...(proxies.length ? proxies : []),
     ``,
     `proxy-groups:`,
+    ...(hasTopSelector ? [
+      `  - name: "节点选择"`,
+      `    type: select`,
+      `    proxies:`,
+      `      - "${escapeYaml(mainGroupName)}"`,
+      `      - "DMIT"`,
+      ``,
+    ] : []),
     `  - name: "自动选择"`,
     `    type: url-test`,
     `    url: "http://www.gstatic.com/generate_204"`,
@@ -380,7 +391,7 @@ function renderClash(nodes) {
     ...allGroupMembers,
     ``,
     `rules:`,
-    `  - MATCH,${mainGroupName}`,
+    `  - MATCH,${ruleTarget}`,
   ].join('\n');
 }
 
