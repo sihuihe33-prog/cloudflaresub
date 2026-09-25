@@ -37,8 +37,10 @@ assert.match(yaml, /type: vless/);
 assert.match(yaml, /"DMIT HY2"/);
 const groups = YAML.parse(yaml)['proxy-groups'];
 assert.deepEqual(groups.find(g => g.name === 'DMIT'), { name: 'DMIT', type: 'select', proxies: [node.name] });
-assert.ok(groups.find(g => g.name === '节点选择').proxies.includes('DMIT'));
+assert.ok(!groups.find(g => g.name === '节点选择').proxies.includes('DMIT'));
+assert.ok(!groups.find(g => g.name === '节点选择').proxies.includes(node.name));
 assert.ok(groups.find(g => g.name === '自动选择').proxies.includes('Old node'));
+assert.ok(!groups.find(g => g.name === '自动选择').proxies.includes(node.name));
 const raw = await worker.fetch(new Request(`https://sub.example/sub/${id}?target=raw&token=test-secret`), env);
 assert.equal(raw.status, 200);
 assert.ok((await raw.text()).length > 0, 'existing raw format stays accessible');
@@ -60,6 +62,10 @@ for (const [shortId, oldName, displayName] of [
   assert.ok(rendered['proxy-groups'].find(g => g.name === 'RackNerd').proxies.includes(displayName));
   assert.ok(rendered['proxy-groups'].find(g => g.name === '自动选择').proxies.includes(displayName));
   assert.ok(!rendered['proxy-groups'].find(g => g.name === 'RackNerd').proxies.includes(oldName));
+  const byName = Object.fromEntries(rendered['proxy-groups'].map(g => [g.name, g.proxies]));
+  assert.deepEqual(byName.DMIT, [node.name], `${shortId} DMIT group has only its own node`);
+  assert.deepEqual(byName['自动选择'], [displayName], `${shortId} auto group excludes DMIT`);
+  assert.deepEqual(byName.RackNerd, ['自动选择', displayName, 'DIRECT'], `${shortId} RackNerd excludes DMIT`);
   assert.equal(JSON.parse(store.get(`sub:${shortId}`)).nodes[0].name, oldName, 'do not mutate KV names');
 }
 console.log('hysteria merge test passed');

@@ -324,17 +324,17 @@ function renderClash(nodes) {
     })
     .filter(Boolean);
 
-  const proxyNames = nodes.map(
+  const isDmit = (node) => node.type === 'hysteria2' && node.server === 'dmit.gghui.top';
+  const proxyNames = nodes.filter((node) => !isDmit(node)).map(
     (node) => `      - "${escapeYaml(displayName(node))}"`
   );
   const dmitProxyNames = nodes
-    .filter((node) => node.type === 'hysteria2' && node.server === 'dmit.gghui.top')
+    .filter(isDmit)
     .map((node) => `      - "${escapeYaml(displayName(node))}"`);
 
   const allGroupMembers = [
     `      - "自动选择"`,
     ...proxyNames,
-    ...(dmitProxyNames.length ? [`      - "DMIT"`] : []),
     `      - DIRECT`,
   ];
 
