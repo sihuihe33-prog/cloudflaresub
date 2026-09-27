@@ -453,10 +453,10 @@ function renderClash(nodes) {
     ] : []),
     `rules:`,
     // Phones have no local Script.js like the PC, so LAN + China direct must come from the subscription.
-    // Play Store's China endpoints are blocked when direct: send them through the proxy before the cn set.
+    // googleapis.cn (Play Store / FCM) sits inside the cn set, so it must be pulled out to the proxy first.
+    // Every other Google domain is outside the cn set and already reaches the proxy via MATCH.
     ...(isRackNerd ? [
       `  - DOMAIN-SUFFIX,googleapis.cn,${ruleTarget}`,
-      `  - DOMAIN-SUFFIX,xn--ngstr-lra8j.com,${ruleTarget}`,
       `  - DOMAIN-SUFFIX,lan,DIRECT`,
       `  - DOMAIN-SUFFIX,local,DIRECT`,
       ...['10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16', '127.0.0.0/8', '100.64.0.0/10', '169.254.0.0/16']

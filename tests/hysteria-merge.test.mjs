@@ -59,13 +59,14 @@ for (const [shortId, oldName, displayName] of [
   assert.deepEqual(rendered['proxy-groups'].map(g => g.name), ['节点选择', '自动选择', 'Auto', 'DMIT', 'RackNerd']);
   // All RN/DMIT nodes exit via a SOCKS static IP that drops UDP; reject QUIC so apps (YouTube) fall back to TCP.
   // Phones get no local Script.js: LAN + China direct must live in the subscription itself.
-  // googleapis.cn / xn--ngstr-lra8j.com are Play Store/Google China endpoints that are blocked when direct.
+  // googleapis.cn is inside the cn set, so it is pulled out to the proxy explicitly; other Google domains fall to MATCH.
   // China lists come from rule-providers fetched through the proxy: a failed fetch leaves the set empty
   // (traffic falls through to the proxy) instead of failing the whole config like GEOSITE/GEOIP would.
   const rules = rendered.rules;
   const at = r => rules.indexOf(r);
   assert.ok(!rules.some(r => /^(GEOSITE|GEOIP),/.test(r)), `${shortId} no geo-file dependent rules`);
   assert.ok(at('DOMAIN-SUFFIX,googleapis.cn,节点选择') >= 0 && at('DOMAIN-SUFFIX,googleapis.cn,节点选择') < at('RULE-SET,cn_domain,DIRECT'), `${shortId} Play CN endpoints proxied before cn set`);
+  assert.ok(!rules.some(r => r.includes('xn--ngstr-lra8j.com')), `${shortId} no redundant Google rule (already reaches MATCH)`);
   assert.ok(at('IP-CIDR,192.168.0.0/16,DIRECT,no-resolve') >= 0 && at('IP-CIDR,10.0.0.0/8,DIRECT,no-resolve') >= 0, `${shortId} LAN direct`);
   // Douyin/ByteDance suffixes missing from geosite cn (same gaps the PC Script.js covers) must be direct explicitly.
   for (const d of ['snssdk.com', 'ibytedtos.com', 'bcast.net', 'douyincloud.com']) {
