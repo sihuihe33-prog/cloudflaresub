@@ -32,8 +32,8 @@ const render = async () => YAML.parse(await (await worker.fetch(new Request(`htt
 let doc = await render();
 assert.deepEqual(doc.proxies.find(p => p.name === 'reality-dmit'), reality, 'reality renders verbatim');
 const groups = Object.fromEntries(doc['proxy-groups'].map(g => [g.name, g.proxies]));
-assert.deepEqual(groups.DMIT, ['自动选择 ', 'hysteria-dmit', 'reality-dmit', 'DIRECT']);
-assert.deepEqual(groups['自动选择 '], ['hysteria-dmit', 'reality-dmit']);
+assert.deepEqual(groups.DMIT, ['Auto', 'hysteria-dmit', 'reality-dmit', 'DIRECT']);
+assert.deepEqual(groups['Auto'], ['hysteria-dmit', 'reality-dmit']);
 assert.deepEqual(groups['自动选择'], ['每日优选CF | 香港 | 1']);
 assert.deepEqual(groups.RackNerd, ['自动选择', '每日优选CF | 香港 | 1', 'DIRECT']);
 
@@ -43,7 +43,7 @@ assert.equal(refresh.status, 200);
 const kept = JSON.parse(store.get(`sub:${id}`)).nodes;
 assert.ok(kept.some(n => n.name === 'reality-dmit') && kept.some(n => n.name === 'hysteria-dmit'), 'refresh keeps DMIT nodes');
 doc = await render();
-assert.deepEqual(Object.fromEntries(doc['proxy-groups'].map(g => [g.name, g.proxies])).DMIT, ['自动选择 ', 'hysteria-dmit', 'reality-dmit', 'DIRECT']);
+assert.deepEqual(Object.fromEntries(doc['proxy-groups'].map(g => [g.name, g.proxies])).DMIT, ['Auto', 'hysteria-dmit', 'reality-dmit', 'DIRECT']);
 // raw target must not crash on the appended node
 assert.equal((await worker.fetch(new Request(`https://sub.example/sub/${id}?target=raw&token=test-secret`), env)).status, 200);
 console.log('reality append test passed');

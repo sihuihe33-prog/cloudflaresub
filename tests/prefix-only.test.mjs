@@ -34,7 +34,7 @@ const names = JSON.parse(store.get(`sub:${id}`)).nodes.map((n) => n.name);
 assert.deepEqual(names, ['RackNerd|每日优选CF | 香港 | 1', 'RackNerd|每日优选CF | 香港 | 2', 'RackNerd|每日优选CF | 香港 | 3', 'hysteria-dmit']);
 
 const doc = YAML.parse(await (await worker.fetch(new Request(`https://sub.example/sub/${id}?target=clash&token=test-secret`), env)).text());
-assert.deepEqual(doc['proxy-groups'].map((g) => g.name), ['节点选择', '自动选择', '自动选择 ', 'DMIT', 'RackNerd']);
+assert.deepEqual(doc['proxy-groups'].map((g) => g.name), ['节点选择', '自动选择', 'Auto', 'DMIT', 'RackNerd']);
 assert.deepEqual(doc['proxy-groups'].find((g) => g.name === '自动选择').proxies, ['每日优选CF | 香港 | 1', '每日优选CF | 香港 | 2', '每日优选CF | 香港 | 3']);
 
 // Without usePrefixOnly the old behaviour (base name first) is preserved for other users of the generator.

@@ -411,9 +411,9 @@ function renderClash(nodes) {
     `    proxies:`,
     ...autoGroupMembers,
     ``,
-    // DMIT 组与 RackNerd 组对齐。组名不能重复，DMIT 的自动选择用尾随空格「自动选择 」区分，界面上看起来一样。
+    // DMIT 组与 RackNerd 组对齐：Auto（url-test，卡片隐藏）+ 各节点 + DIRECT。组名不能与 RackNerd 的「自动选择」重复。
     ...(dmitProxyNames.length ? [
-      `  - name: "自动选择 "`,
+      `  - name: "Auto"`,
       `    type: url-test`,
       `    hidden: true`,
       `    url: "http://www.gstatic.com/generate_204"`,
@@ -425,7 +425,7 @@ function renderClash(nodes) {
       `  - name: "DMIT"`,
       `    type: select`,
       `    proxies:`,
-      `      - "自动选择 "`,
+      `      - "Auto"`,
       ...dmitProxyNames,
       `      - DIRECT`,
       ``,
