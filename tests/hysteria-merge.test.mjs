@@ -36,7 +36,8 @@ assert.match(yaml, /skip-cert-verify: false/);
 assert.match(yaml, /type: vless/);
 assert.match(yaml, /"DMIT HY2"/);
 const groups = YAML.parse(yaml)['proxy-groups'];
-assert.deepEqual(groups.find(g => g.name === 'DMIT'), { name: 'DMIT', type: 'select', proxies: [node.name] });
+assert.deepEqual(groups.find(g => g.name === 'DMIT'), { name: 'DMIT', type: 'select', proxies: ['DMIT自动选择', node.name, 'DIRECT'] });
+assert.deepEqual(groups.find(g => g.name === 'DMIT自动选择').proxies, [node.name]);
 assert.ok(!groups.find(g => g.name === '节点选择').proxies.includes('DMIT'));
 assert.ok(!groups.find(g => g.name === '节点选择').proxies.includes(node.name));
 assert.ok(groups.find(g => g.name === '自动选择').proxies.includes('Old node'));
@@ -55,7 +56,7 @@ for (const [shortId, oldName, displayName] of [
 ]) {
   store.set(`sub:${shortId}`, JSON.stringify({ nodes: [{ ...oldNode, name: oldName }, node] }));
   const rendered = YAML.parse(await (await worker.fetch(new Request(`https://sub.example/sub/${shortId}?target=clash&token=test-secret`), env)).text());
-  assert.deepEqual(rendered['proxy-groups'].map(g => g.name), ['节点选择', '自动选择', 'DMIT', 'RackNerd']);
+  assert.deepEqual(rendered['proxy-groups'].map(g => g.name), ['节点选择', '自动选择', 'DMIT自动选择', 'DMIT', 'RackNerd']);
   // All RN/DMIT nodes exit via a SOCKS static IP that drops UDP; reject QUIC so apps (YouTube) fall back to TCP.
   // Phones get no local Script.js: LAN + China direct must live in the subscription itself.
   // googleapis.cn / xn--ngstr-lra8j.com are Play Store/Google China endpoints that are blocked when direct.
@@ -101,7 +102,8 @@ for (const [shortId, oldName, displayName] of [
   assert.ok(rendered['proxy-groups'].find(g => g.name === '自动选择').proxies.includes(displayName));
   assert.ok(!rendered['proxy-groups'].find(g => g.name === 'RackNerd').proxies.includes(oldName));
   const byName = Object.fromEntries(rendered['proxy-groups'].map(g => [g.name, g.proxies]));
-  assert.deepEqual(byName.DMIT, [node.name], `${shortId} DMIT group has only its own node`);
+  assert.deepEqual(byName.DMIT, ['DMIT自动选择', node.name, 'DIRECT'], `${shortId} DMIT group has only its own node`);
+  assert.deepEqual(byName['DMIT自动选择'], [node.name], `${shortId} DMIT auto group has only DMIT nodes`);
   assert.deepEqual(byName['自动选择'], [displayName], `${shortId} auto group excludes DMIT`);
   assert.deepEqual(byName.RackNerd, ['自动选择', displayName, 'DIRECT'], `${shortId} RackNerd excludes DMIT`);
   assert.equal(JSON.parse(store.get(`sub:${shortId}`)).nodes[0].name, oldName, 'do not mutate KV names');
